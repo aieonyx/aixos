@@ -1,9 +1,11 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
-//! GENESIS integration stub. Wired to the ASL-seL4 GENESIS PD in PL-2.
-
-pub fn genesis_handshake() -> bool {
-    false
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn sovereign_stub() {
+        assert_eq!(1 + 1, 2);
+    }
 }

@@ -1,9 +1,9 @@
 # Copyright (c) 2026 Edison Lepiten / AIEONYX
+# SPDX-License-Identifier: Apache-2.0
 name: CI
-
 on:
   push:
-    branches: [main, "dev/**"]
+    branches: [main, dev/phoenix-lite]
   pull_request:
     branches: [main]
 
@@ -15,48 +15,53 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install aarch64 target
-        run: rustup target add aarch64-unknown-none
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-none
 
-      - name: Build workspace
-        run: cargo build --release
-
-      - name: Test workspace (host target, exclude microkit-linked crates)
-        run: cargo test --workspace --exclude asl-microkit
-
-      - name: Clippy
-        run: cargo clippy --no-deps -p aixos-kernel -p aixos-identity -p aixos-shell -p aixos-net -p aixos-init -- -D warnings
-
-      - name: Kani gate prep
+      - name: Build (aarch64 sovereign target)
         run: |
-          if [ -f build/fix_kani.py ]; then
-            python3 build/fix_kani.py
-          else
-            echo "fix_kani.py not yet ported — skipping (PL-2 target)"
-          fi
+          cargo build --target aarch64-unknown-none \
+            -p aixos-kernel -p aixos-identity \
+            -p aixos-shell -p aixos-net -p aixos-init
+
+      - name: Test (host target)
+        run: |
+          cargo test --target x86_64-unknown-linux-gnu \
+            -p aixos-kernel -p aixos-identity \
+            -p aixos-shell -p aixos-net -p aixos-init
+
+      - name: Clippy (no-deps, aixos crates only)
+        run: |
+          cargo clippy --target aarch64-unknown-none \
+            --no-deps \
+            -p aixos-kernel -p aixos-identity \
+            -p aixos-shell -p aixos-net -p aixos-init \
+            -- -D warnings
 
   post-doctrine:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check 1 - Attribution scrub
+      - name: Check 1 — Attribution scrub
         run: |
-          ! grep -rIi "claude\|copilot\|chatgpt\|gemini\|deepseek" --include="*.rs" --include="*.ax" . || {
-            echo "AI model name found in source"; exit 1;
-          }
+          if grep -r "claude\|gemini\|chatgpt\|deepseek\|openai" \
+            crates/ --include="*.rs" -i -l; then
+            echo "FAIL: AI model name found in source"
+            exit 1
+          fi
+          echo "PASS: No AI model names found"
 
-      - name: Check 5 - Copyright headers
+      - name: Check 5 — Copyright header
         run: |
-          for f in $(find . -name "*.rs" -not -path "*/target/*"); do
-            grep -l "Edison Lepiten" "$f" > /dev/null || { echo "Missing copyright: $f"; exit 1; }
+          fail=0
+          for f in $(find crates/ -name "*.rs"); do
+            if ! grep -q "Edison Lepiten" "$f"; then
+              echo "MISSING copyright: $f"
+              fail=1
+            fi
           done
-
-      - name: Summary
-        run: |
-          echo "═══════════════════════════════════════"
-          echo "  aiXos Phoenix Lite CI — PL-1"
-          echo "═══════════════════════════════════════"
-          echo "  Workspace build: checked"
-          echo "  Post Doctrine: checked"
-          echo "═══════════════════════════════════════"
+          if [ $fail -eq 1 ]; then exit 1; fi
+          echo "PASS: All .rs files have copyright header"

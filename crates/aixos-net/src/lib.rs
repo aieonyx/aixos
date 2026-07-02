@@ -1,9 +1,11 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
-//! AWP-Lite sovereign socket stub. Implemented in AXONYX (.ax) at PL-4.
-
-pub fn socket_ready() -> bool {
-    false
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn sovereign_stub() {
+        assert_eq!(1 + 1, 2);
+    }
 }

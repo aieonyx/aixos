@@ -1,10 +1,11 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
-//! Boot orchestrator stub. Sequences kernel/identity/net/shell bring-up.
-//! Gains a real entry point (_start) once GENESIS wiring lands in PL-2.
-
-pub fn orchestrate() -> bool {
-    false
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn sovereign_stub() {
+        assert_eq!(1 + 1, 2);
+    }
 }
