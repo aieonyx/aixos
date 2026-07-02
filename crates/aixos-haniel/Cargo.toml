@@ -1,13 +1,10 @@
 [package]
-name = "aixos-init"
+name = "aixos-haniel"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
 [lib]
-name = "aixos_init"
+name = "aixos_haniel"
 path = "src/lib.rs"
-
-[dependencies]
-aixos-kernel = { path = "../aixos-kernel" }
