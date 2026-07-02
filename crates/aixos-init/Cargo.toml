@@ -12,3 +12,4 @@ path = "src/lib.rs"
 [dependencies]
 aixos-kernel = { path = "../aixos-kernel" }
 aixos-identity = { path = "../aixos-identity" }
+aixos-net = { path = "../aixos-net" }

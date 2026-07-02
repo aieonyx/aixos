@@ -23,6 +23,7 @@ version = "0.1.0"
 dependencies = [
  "aixos-identity",
  "aixos-kernel",
+ "aixos-net",
 ]
 
 [[package]]
@@ -32,6 +33,9 @@ version = "0.1.0"
 [[package]]
 name = "aixos-net"
 version = "0.1.0"
+dependencies = [
+ "aixos-kernel",
+]
 
 [[package]]
 name = "aixos-shell"

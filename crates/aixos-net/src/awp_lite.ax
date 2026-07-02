@@ -1,0 +1,18 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+
+fn packet_tag(node_id: i64, version: i64) -> i64 {
+    let tag: i64 = node_id + version;
+    return tag;
+}
+
+fn signature_verify(tag: i64, sig: i64) -> i64 {
+    let verified: i64 = 0;
+    return verified;
+}
+
+fn awp_send(node_id: i64, version: i64) -> i64 {
+    let tag: i64 = packet_tag(node_id, version);
+    let sig: i64 = 0;
+    let verified: i64 = signature_verify(tag, sig);
+    return tag;
+}
