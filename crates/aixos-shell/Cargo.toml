@@ -8,3 +8,7 @@ license.workspace = true
 [lib]
 name = "aixos_shell"
 path = "src/lib.rs"
+
+[dependencies]
+aixos-kernel = { path = "../aixos-kernel" }
+aixos-haniel = { path = "../aixos-haniel" }

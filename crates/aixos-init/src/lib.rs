@@ -5,6 +5,8 @@
 use aixos_kernel::{GenesisPd, boot::boot_sequence};
 use aixos_identity::ArpiCeremony;
 use aixos_net::AwpLite;
+use aixos_shell::{SovereignShell, render_banner, render_node_id,
+    render_awp_status, render_proof, render_prompt};
 
 pub const BOOT_BANNER: &str = "aiXos Phoenix - Sovereign Stack Initializing...";
 
@@ -12,11 +14,17 @@ pub fn orchestrate() -> u32 {
     let genesis = GenesisPd::new();
     let arpi = ArpiCeremony::new();
     let awp = AwpLite::new();
-    boot_sequence(&[&genesis, &arpi, &awp])
+    let shell = SovereignShell::new();
+    let proof = boot_sequence(&[&genesis, &arpi, &awp, &shell]);
+    render_banner();
+    render_node_id(0);
+    render_awp_status(false);
+    render_proof(proof);
+    render_prompt();
+    proof
 }
 
 pub struct ProofLine(pub u32);
-
 pub fn proof_line(proof: u32) -> ProofLine { ProofLine(proof) }
 
 #[cfg(test)]

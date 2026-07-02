@@ -1,0 +1,14 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+
+fn shell_init() -> i64 {
+    return 0;
+}
+
+fn prompt_render() -> i64 {
+    let token: i64 = 0x5348;
+    return token;
+}
+
+fn eql_dispatch(query: i64) -> i64 {
+    return query;
+}

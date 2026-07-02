@@ -1,0 +1,21 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+
+fn banner_row() -> i64 {
+    return 0;
+}
+
+fn identity_row() -> i64 {
+    return 1;
+}
+
+fn status_row() -> i64 {
+    return 2;
+}
+
+fn proof_row() -> i64 {
+    return 3;
+}
+
+fn prompt_row() -> i64 {
+    return 4;
+}

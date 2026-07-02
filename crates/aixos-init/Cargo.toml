@@ -13,3 +13,4 @@ path = "src/lib.rs"
 aixos-kernel = { path = "../aixos-kernel" }
 aixos-identity = { path = "../aixos-identity" }
 aixos-net = { path = "../aixos-net" }
+aixos-shell = { path = "../aixos-shell" }
