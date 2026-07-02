@@ -1,6 +1,6 @@
 [submodule "axon"]
 	path = axon
-	url = git@github.com:aieonyx/AXON.git
+	url = https://github.com/aieonyx/AXON.git
 [submodule "asl"]
 	path = asl
-	url = git@github.com:aieonyx/asl.git
+	url = https://github.com/aieonyx/asl.git
