@@ -2,10 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 #![cfg_attr(not(test), no_std)]
 
-pub const BOOT_BANNER: &str = "aiXos Phoenix — Sovereign Stack Initializing...";
+use aixos_kernel::{GenesisPd, boot::boot_sequence};
+use aixos_identity::ArpiCeremony;
+
+pub const BOOT_BANNER: &str = "aiXos Phoenix - Sovereign Stack Initializing...";
 
 pub fn orchestrate() -> u32 {
-    aixos_kernel::boot::boot_sequence()
+    let genesis = GenesisPd::new();
+    let arpi = ArpiCeremony::new();
+    boot_sequence(&[&genesis, &arpi])
 }
 
 pub struct ProofLine(pub u32);
@@ -24,13 +29,12 @@ mod tests {
     }
 
     #[test]
-    fn orchestrate_returns_zero_before_pds_are_live() {
+    fn orchestrate_returns_zero_before_pds_live() {
         assert_eq!(orchestrate(), 0);
     }
 
     #[test]
-    fn proof_line_carries_proof_value() {
-        let line = proof_line(0x4153);
-        assert_eq!(line.0, 0x4153);
+    fn proof_line_carries_value() {
+        assert_eq!(proof_line(0x4153).0, 0x4153);
     }
 }

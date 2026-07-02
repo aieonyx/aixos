@@ -13,11 +13,15 @@ version = "0.1.0"
 [[package]]
 name = "aixos-identity"
 version = "0.1.0"
+dependencies = [
+ "aixos-kernel",
+]
 
 [[package]]
 name = "aixos-init"
 version = "0.1.0"
 dependencies = [
+ "aixos-identity",
  "aixos-kernel",
 ]
 

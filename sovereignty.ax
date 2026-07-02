@@ -1,0 +1,18 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+// SPDX-License-Identifier: Apache-2.0
+// aiXos Phoenix - sovereign OS build manifest.
+
+fn os_name() -> i64 {
+    let name: i64 = 0;
+    return name;
+}
+
+fn os_version() -> i64 {
+    let version: i64 = 1;
+    return version;
+}
+
+fn sovereign_proof() -> i64 {
+    let proof: i64 = 16723;
+    return proof;
+}
