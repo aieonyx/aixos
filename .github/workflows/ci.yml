@@ -1,0 +1,62 @@
+# Copyright (c) 2026 Edison Lepiten / AIEONYX
+name: CI
+
+on:
+  push:
+    branches: [main, "dev/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install aarch64 target
+        run: rustup target add aarch64-unknown-none
+
+      - name: Build workspace
+        run: cargo build --release
+
+      - name: Test workspace (host target, exclude microkit-linked crates)
+        run: cargo test --workspace --exclude asl-microkit
+
+      - name: Clippy
+        run: cargo clippy --no-deps -p aixos-kernel -p aixos-identity -p aixos-shell -p aixos-net -p aixos-init -- -D warnings
+
+      - name: Kani gate prep
+        run: |
+          if [ -f build/fix_kani.py ]; then
+            python3 build/fix_kani.py
+          else
+            echo "fix_kani.py not yet ported — skipping (PL-2 target)"
+          fi
+
+  post-doctrine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check 1 - Attribution scrub
+        run: |
+          ! grep -rIi "claude\|copilot\|chatgpt\|gemini\|deepseek" --include="*.rs" --include="*.ax" . || {
+            echo "AI model name found in source"; exit 1;
+          }
+
+      - name: Check 5 - Copyright headers
+        run: |
+          for f in $(find . -name "*.rs" -not -path "*/target/*"); do
+            grep -l "Edison Lepiten" "$f" > /dev/null || { echo "Missing copyright: $f"; exit 1; }
+          done
+
+      - name: Summary
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "  aiXos Phoenix Lite CI — PL-1"
+          echo "═══════════════════════════════════════"
+          echo "  Workspace build: checked"
+          echo "  Post Doctrine: checked"
+          echo "═══════════════════════════════════════"

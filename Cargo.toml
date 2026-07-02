@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/aixos-kernel",
+    "crates/aixos-identity",
+    "crates/aixos-shell",
+    "crates/aixos-net",
+    "crates/aixos-init",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Edison Lepiten <aieonyx.eu@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/aieonyx/aixos"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+panic = "abort"

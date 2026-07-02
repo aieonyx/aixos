@@ -1,0 +1,10 @@
+[package]
+name = "aixos-shell"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "aixos_shell"
+path = "src/lib.rs"
