@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), no_std)]
 
 pub mod bastion_pd;
+pub mod boot_mode;
 
 use aixos_kernel::{GenesisPd, boot::boot_sequence};
 use aixos_identity::ArpiCeremony;
@@ -10,10 +11,12 @@ use aixos_net::AwpLite;
 use aixos_shell::{SovereignShell, render_banner, render_node_id,
     render_awp_status, render_proof, render_prompt};
 use crate::bastion_pd::BastionPd;
+use crate::boot_mode::detect;
 
 pub const BOOT_BANNER: &str = "aiXos Phoenix - Sovereign Stack Initializing...";
 
 pub fn orchestrate() -> u32 {
+    let _mode = detect();
     let genesis = GenesisPd::new();
     let arpi = ArpiCeremony::new();
     let awp = AwpLite::new();

@@ -1,0 +1,21 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+
+fn boot_mode_live() -> i64 {
+    return 1;
+}
+
+fn boot_mode_persistent() -> i64 {
+    return 2;
+}
+
+fn boot_mode_install() -> i64 {
+    return 3;
+}
+
+fn boot_select() -> i64 {
+    return boot_mode_live();
+}
+
+fn boot_verify() -> i64 {
+    return 0x4153;
+}
