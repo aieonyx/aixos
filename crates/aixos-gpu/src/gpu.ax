@@ -1,0 +1,17 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+
+fn framebuffer_init() -> i64 {
+    return 0x4642;
+}
+
+fn sovereign_color() -> i64 {
+    return 0x7B4FDB;
+}
+
+fn resolution_width() -> i64 {
+    return 1280;
+}
+
+fn resolution_height() -> i64 {
+    return 720;
+}

@@ -8,6 +8,8 @@ members = [
     "crates/aixos-init",
     "crates/aixos-haniel",
     "crates/aixos-edisondb",
+    "crates/aixos-gpu",
+    "crates/aixos-input",
 ]
 
 [workspace.package]

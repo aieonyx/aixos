@@ -7,6 +7,13 @@ name = "aixos-edisondb"
 version = "0.1.0"
 
 [[package]]
+name = "aixos-gpu"
+version = "0.1.0"
+dependencies = [
+ "aixos-kernel",
+]
+
+[[package]]
 name = "aixos-haniel"
 version = "0.1.0"
 
@@ -26,6 +33,13 @@ dependencies = [
  "aixos-kernel",
  "aixos-net",
  "aixos-shell",
+]
+
+[[package]]
+name = "aixos-input"
+version = "0.1.0"
+dependencies = [
+ "aixos-kernel",
 ]
 
 [[package]]
