@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+// SPDX-License-Identifier: Apache-2.0
 fn main() {
     println!("cargo:rerun-if-changed=../../boot/boot.s");
     let out = std::env::var("OUT_DIR").unwrap();
