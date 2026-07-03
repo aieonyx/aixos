@@ -1,18 +1,25 @@
 /* Copyright (c) 2026 Edison Lepiten / AIEONYX */
-/* Output: target/aarch64-unknown-none/release/aixos.elf */
 
 ENTRY(_start)
 
 MEMORY
 {
-    RAM (rwx) : ORIGIN = 0x40000000, LENGTH = 2M
+    RAM (rwx) : ORIGIN = 0x40000000, LENGTH = 128M
 }
 
 SECTIONS
 {
     . = ORIGIN(RAM);
-    .text   : { *(.text*)   } > RAM
+    .text : {
+        KEEP(*(.text.boot))
+        *(.text*)
+    } > RAM
     .rodata : { *(.rodata*) } > RAM
     .data   : { *(.data*)   } > RAM
-    .bss    : { *(.bss*)    } > RAM
+    .bss    : {
+        *(.bss*)
+        . = ALIGN(16);
+        . += 0x10000;
+        _stack_top = .;
+    } > RAM
 }

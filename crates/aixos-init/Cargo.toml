@@ -9,6 +9,10 @@ license.workspace = true
 name = "aixos_init"
 path = "src/lib.rs"
 
+[[bin]]
+name = "aixos"
+path = "src/main.rs"
+
 [dependencies]
 aixos-kernel = { path = "../aixos-kernel" }
 aixos-identity = { path = "../aixos-identity" }

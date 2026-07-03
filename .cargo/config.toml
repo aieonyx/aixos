@@ -1,14 +1,9 @@
 # Copyright (c) 2026 Edison Lepiten / AIEONYX
-
 [build]
 target = "aarch64-unknown-none"
 
 [target.aarch64-unknown-none]
 rustflags = [
-    "-C", "link-arg=-nostartfiles",
     "-C", "relocation-model=static",
+    "-C", "link-arg=-Tboot/aixos-boot.ld",
 ]
-
-# Host-target test runs (cargo test --exclude asl-microkit pattern)
-# override this via `cargo test --target <host-triple>` until a
-# proper seL4 test harness lands in PL-2.
