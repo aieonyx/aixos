@@ -29,6 +29,7 @@ jobs:
       - name: Test (host target)
         run: |
           cargo test --target x86_64-unknown-linux-gnu \
+            --lib \
             -p aixos-kernel -p aixos-identity \
             -p aixos-shell -p aixos-net -p aixos-init
 
