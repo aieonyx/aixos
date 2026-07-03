@@ -18,7 +18,8 @@
 
 ## What is aiXos Phoenix?
 
-aiXos Phoenix is a sovereign desktop operating system by [AIEONYX](https://github.com/aieonyx).
+aiXos is a sovereign desktop operating system by [AIEONYX](https://github.com/aieonyx).
+Phoenix is the name of Version 1 — the first era of the aiXos family.
 It is built on a formally verified seL4 microkernel with an application layer
 written in [AXONYX](https://github.com/aieonyx/AXON) — a sovereign systems programming
 language designed from the ground up for this stack.
@@ -33,7 +34,7 @@ Every component in the boot chain declares sovereignty:
 
 ---
 
-## Current State — v0.1.0 Phoenix Lite
+## Current State — aiXos v0.1.0 (Phoenix Lite Edition)
 
 This is the first public release. aiXos Phoenix Lite is a bootable sovereign OS
 that runs on aarch64 hardware and QEMU. It boots, establishes identity, enforces
@@ -110,7 +111,7 @@ formally verified microkernel.
 
 ## Roadmap
 
-### Phoenix Lite (v0.1) — NOW
+### aiXos Phoenix Lite (v0.1) — NOW
 - [x] seL4 microkernel boot
 - [x] ARPi identity ceremony
 - [x] AWP-Lite signed networking
@@ -119,7 +120,7 @@ formally verified microkernel.
 - [x] 7 AXONYX .ax files running in the OS
 - [x] Bootable on QEMU aarch64
 
-### Phoenix Full (v1.0) — Next
+### aiXos Phoenix Full (v1.0) — Next
 - [ ] Full AXONYX application layer (zero Rust stubs)
 - [ ] HANIEL pixel-perfect desktop surface
 - [ ] Onyxia browser integrated
@@ -129,7 +130,7 @@ formally verified microkernel.
 - [ ] AIX Coin sovereign economy layer
 - [ ] IAM — Intelligent Assistant to Man
 
-### Phoenix Enterprise (v2.0) — Future
+### aiXos v2.0 (Next version name TBD) — Future
 - [ ] AXIOM/SOMA hardware identity binding
 - [ ] Aegis collective defense
 - [ ] Multi-node sovereign mesh
