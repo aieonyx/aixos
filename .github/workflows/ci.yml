@@ -36,7 +36,7 @@ jobs:
       - name: Clippy (no-deps, aixos crates only)
         run: |
           cargo clippy --target aarch64-unknown-none \
-            --no-deps \
+            --no-deps --lib \
             -p aixos-kernel -p aixos-identity \
             -p aixos-shell -p aixos-net -p aixos-init \
             -- -D warnings
