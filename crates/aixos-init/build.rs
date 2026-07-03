@@ -2,10 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 fn main() {
     println!("cargo:rerun-if-changed=../../boot/boot.s");
+    let assembler = std::process::Command::new("aarch64-linux-gnu-as")
+        .arg("--version")
+        .status();
+    if assembler.is_err() { return; }
     let out = std::env::var("OUT_DIR").unwrap();
+    let obj = format!("{}/boot.o", out);
     let status = std::process::Command::new("aarch64-linux-gnu-as")
-        .args(["-o", &format!("{}/boot.o", out), "../../boot/boot.s"])
+        .args(["-o", &obj, "../../boot/boot.s"])
         .status().unwrap();
-    assert!(status.success());
-    println!("cargo:rustc-link-arg={}/boot.o", out);
+    if status.success() {
+        println!("cargo:rustc-link-arg={}", obj);
+    }
 }
