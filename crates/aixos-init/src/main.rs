@@ -3,6 +3,7 @@
 #![no_std]
 #![no_main]
 #![cfg(not(test))]
+#![allow(clippy::empty_loop)]
 
 use core::panic::PanicInfo;
 
