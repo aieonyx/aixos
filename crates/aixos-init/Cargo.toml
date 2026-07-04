@@ -19,3 +19,5 @@ aixos-identity = { path = "../aixos-identity" }
 aixos-net = { path = "../aixos-net" }
 aixos-shell = { path = "../aixos-shell" }
 aixos-edisondb = { path = "../aixos-edisondb" }
+aixos-gpu = { path = "../aixos-gpu" }
+aixos-input = { path = "../aixos-input" }

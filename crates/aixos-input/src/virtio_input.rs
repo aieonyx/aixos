@@ -8,7 +8,7 @@ const OFF_STATUS: usize = 0x070;
 const OFF_CONFIG_SPACE: usize = 0x100;
 
 const VIRTIO_MAGIC: u32 = 0x74726976;
-const VIRTIO_VERSION: u32 = 0x2;
+const VIRTIO_VERSION: u32 = 0x1;
 const INPUT_DEVICE_ID: u32 = 0x12;
 
 pub const CFG_SELECT_OFFSET: usize = 0x00;

@@ -29,7 +29,9 @@ name = "aixos-init"
 version = "0.1.0"
 dependencies = [
  "aixos-edisondb",
+ "aixos-gpu",
  "aixos-identity",
+ "aixos-input",
  "aixos-kernel",
  "aixos-net",
  "aixos-shell",

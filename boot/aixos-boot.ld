@@ -4,7 +4,8 @@ ENTRY(_start)
 
 MEMORY
 {
-    RAM (rwx) : ORIGIN = 0x40000000, LENGTH = 128M
+    RAM  (rwx) : ORIGIN = 0x40000000, LENGTH = 256M
+    FBMEM (rw) : ORIGIN = 0x44000000, LENGTH = 4M
 }
 
 SECTIONS
@@ -22,4 +23,5 @@ SECTIONS
         . += 0x10000;
         _stack_top = .;
     } > RAM
+    .fb (NOLOAD) : { *(.fb) } > FBMEM
 }
