@@ -83,11 +83,11 @@ impl Virtqueue {
         let slot = self.ring.avail.idx % QUEUE_SIZE as u16;
         self.ring.avail.ring[slot as usize] = idx;
         unsafe {
-            core::arch::asm!("dsb sy", "isb", options(nostack, nomem));
+            { #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack, nomem)); } }
         }
         self.ring.avail.idx = self.ring.avail.idx.wrapping_add(1);
         unsafe {
-            core::arch::asm!("dsb sy", "isb", options(nostack, nomem));
+            { #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack, nomem)); } }
         }
         self.next_free = self.next_free.wrapping_add(1);
         idx
@@ -114,9 +114,9 @@ impl Virtqueue {
         // Add head (cmd) to available ring
         let slot = self.ring.avail.idx % QUEUE_SIZE as u16;
         self.ring.avail.ring[slot as usize] = cmd_idx;
-        unsafe { core::arch::asm!("dsb sy", options(nostack, nomem)); }
+        unsafe { { #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack, nomem)); } } }
         self.ring.avail.idx = self.ring.avail.idx.wrapping_add(1);
-        unsafe { core::arch::asm!("dsb sy", options(nostack, nomem)); }
+        unsafe { { #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack, nomem)); } } }
         self.next_free = self.next_free.wrapping_add(2);
     }
 
@@ -125,7 +125,7 @@ impl Virtqueue {
     }
 
     pub fn poll_used(&mut self) -> Option<u16> {
-        unsafe { core::arch::asm!("dsb sy", "isb", options(nostack, nomem)); }
+        unsafe { { #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack, nomem)); } } }
         if self.ring.used.idx == self.last_used { return None; }
         let slot = self.last_used % QUEUE_SIZE as u16;
         let id = self.ring.used.ring[slot as usize].id as u16;

@@ -15,7 +15,7 @@ pub fn fb_size() -> u32 { (WIDTH * HEIGHT * 4) as u32 }
 
 pub fn cache_flush() {
     unsafe {
-        core::arch::asm!("dsb sy", "isb", options(nostack, nomem));
+        core::arch::asm!("dsb sy", options(nostack, nomem));
     }
 }
 
