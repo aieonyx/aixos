@@ -22,9 +22,11 @@ pub extern "C" fn aixos_main() -> ! {
     match aixos_gpu::init() {
         Some(_) => {
             uart_write("GPU: ok\n");
-            aixos_gpu::fill_rect(0, 0, 1280, 720, aixos_gpu::SOVEREIGN_PURPLE);
-            aixos_gpu::flush(0, 0, 1280, 720);
-            uart_write("GPU: purple\n");
+            aixos_gpu::desktop::render_desktop();
+            aixos_gpu::desktop::render_status_bar(
+                "aiXos Phoenix  |  axon_main() -> 0x4153  |  Sovereign");
+            aixos_gpu::desktop::render_dock();
+            uart_write("Desktop rendered\n");
         }
         None => { uart_write("GPU: none\n"); }
     }

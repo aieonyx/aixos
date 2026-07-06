@@ -1,0 +1,21 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+
+fn panel_left_width() -> i64 {
+    return 200;
+}
+
+fn panel_right_width() -> i64 {
+    return 200;
+}
+
+fn topbar_height() -> i64 {
+    return 40;
+}
+
+fn dock_height() -> i64 {
+    return 50;
+}
+
+fn desktop_color() -> i64 {
+    return 0x0A0A1A;
+}

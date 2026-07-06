@@ -3,6 +3,9 @@
 #![cfg_attr(not(test), no_std)]
 
 pub mod commands;
+pub mod draw;
+pub mod desktop;
+pub mod font;
 pub mod ramfb;
 pub mod framebuffer;
 pub mod virtio_gpu;

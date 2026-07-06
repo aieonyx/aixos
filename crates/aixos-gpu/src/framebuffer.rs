@@ -5,7 +5,7 @@ pub const WIDTH: usize = 1280;
 pub const HEIGHT: usize = 720;
 
 #[link_section = ".fb"]
-static mut FRAMEBUFFER: [u32; WIDTH * HEIGHT] = [0; WIDTH * HEIGHT];
+pub static mut FRAMEBUFFER: [u32; WIDTH * HEIGHT] = [0; WIDTH * HEIGHT];
 
 pub fn fb_addr() -> u64 {
     core::ptr::addr_of!(FRAMEBUFFER) as u64
