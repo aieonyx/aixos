@@ -1,0 +1,7 @@
+// Copyright (c) 2026 Edison Lepiten / AIEONYX
+
+fn ev_key_type() -> i64 { return 1; }
+fn key_enter() -> i64 { return 28; }
+fn key_esc() -> i64 { return 1; }
+fn key_backspace() -> i64 { return 14; }
+fn key_space() -> i64 { return 57; }

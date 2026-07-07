@@ -145,3 +145,12 @@ pub fn draw_str(x: u32, y: u32, s: &str, color: u32) {
         cx += 9;
     }
 }
+
+pub fn draw_bytes(x: u32, y: u32, buf: &[u8], color: u32) {
+    let mut cx = x;
+    for &b in buf {
+        if cx + 8 > 1280 { break; }
+        draw_char(cx, y, b as char, color);
+        cx += 8;
+    }
+}

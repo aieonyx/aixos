@@ -64,3 +64,22 @@ pub fn render_status_bar(text: &str) {
 pub fn render_dock() {
     draw_str(350, 682, "axos>", TEXT_WHITE);
 }
+
+use crate::draw::{draw_rect as fill, draw_border as db};
+use crate::font::draw_bytes;
+
+const TEXT_DIM_2: u32 = 0x666688;
+
+pub fn render_input_line(buf: &[u8], len: usize) {
+    draw_rect(340, 670, 600, 50, DOCK_BG);
+    draw_border(340, 670, 600, 50, PANEL_BORDER);
+    draw_str(348, 682, "axos> ", 0x666688);
+    let n = if len < buf.len() { len } else { buf.len() };
+    crate::font::draw_bytes(398, 682, &buf[..n], TEXT_WHITE);
+}
+
+pub fn render_command_result(msg: &str) {
+    draw_rect(340, 670, 600, 50, DOCK_BG);
+    draw_border(340, 670, 600, 50, PANEL_BORDER);
+    draw_str(348, 682, msg, ACCENT_TEAL);
+}
