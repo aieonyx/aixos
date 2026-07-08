@@ -29,7 +29,7 @@ SECTIONS
     _file_end  = .;
     _file_size = _file_end - ORIGIN(RAM);
     _text_size = _file_end - _text_start;
-    _entry_rva = efi_entry - ORIGIN(RAM);
+    _entry_rva = DEFINED(efi_entry) ? efi_entry - ORIGIN(RAM) : 0;
     . = ALIGN(4096);
     _img_end   = .;
     _img_size  = _img_end - ORIGIN(RAM);
