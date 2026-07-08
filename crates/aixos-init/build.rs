@@ -2,16 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 fn main() {
     println!("cargo:rerun-if-changed=../../boot/boot.s");
+    println!("cargo:rerun-if-changed=../../boot/head_pe.s");
     let assembler = std::process::Command::new("aarch64-linux-gnu-as")
         .arg("--version")
         .status();
     if assembler.is_err() { return; }
     let out = std::env::var("OUT_DIR").unwrap();
-    let obj = format!("{}/boot.o", out);
-    let status = std::process::Command::new("aarch64-linux-gnu-as")
-        .args(["-o", &obj, "../../boot/boot.s"])
+    // Assemble boot.s
+    let boot_obj = format!("{}/boot.o", out);
+    let s1 = std::process::Command::new("aarch64-linux-gnu-as")
+        .args(["-o", &boot_obj, "../../boot/boot.s"])
         .status().unwrap();
-    if status.success() {
-        println!("cargo:rustc-link-arg={}", obj);
+    if s1.success() {
+        println!("cargo:rustc-link-arg={}", boot_obj);
+    }
+    // Assemble head_pe.s (PE/COFF EFI header for ISO boot)
+    let head_obj = format!("{}/head_pe.o", out);
+    let s2 = std::process::Command::new("aarch64-linux-gnu-as")
+        .args(["-o", &head_obj, "../../boot/head_pe.s"])
+        .status().unwrap();
+    if s2.success() {
+        println!("cargo:rustc-link-arg={}", head_obj);
     }
 }

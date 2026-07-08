@@ -3,3 +3,5 @@ axon/target/
 asl/target/
 *.o
 *.d
+dist/*.iso
+iso-root/
