@@ -8,6 +8,7 @@ const MMIO_SLOT_STEP: usize = 0x200;
 const MMIO_SLOT_COUNT: usize = 32;
 const VIRT_MAGIC: u32 = 0x7472_6976;
 const DEVICE_ID_INPUT: u32 = 0x12;
+#[allow(dead_code)]
 const OFF_MAGIC: usize = 0x000;
 const OFF_VERSION: usize = 0x004;
 const OFF_DEVICE_ID: usize = 0x008;

@@ -148,7 +148,7 @@ fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
         _ => {
             if let Some(c) = ch {
                 let b = c as u8;
-                if b >= 0x20 && b < 0x7f {
+                if (0x20..0x7fu8).contains(&b) {
                     if buf.push(b) {
                         uart_write_byte(b);
                         aixos_gpu::desktop::render_input_line(buf.as_slice(), buf.len);

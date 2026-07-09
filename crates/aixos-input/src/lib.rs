@@ -47,7 +47,7 @@ pub fn poll() -> Option<KeyEvent> {
         return Some(KeyEvent {
             code,
             value: 1,
-            ch: if b >= 0x20 && b < 0x7f { Some(b as char) } else { None },
+            ch: if (0x20..0x7f).contains(&b) { Some(b as char) } else { None },
         });
     }
 
