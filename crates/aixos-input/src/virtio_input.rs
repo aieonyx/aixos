@@ -81,6 +81,8 @@ pub static mut DEVICE_BASE: usize = 0;
 static mut DEVICE_VER: u32 = 0;
 static mut LAST_SEEN: u16 = 0;
 static mut AVAIL_IDX: u16 = 0;
+// PL-14: track whether driver_ok was successfully written
+static mut DRIVER_OK_WRITTEN: bool = false;
 
 fn dsb() {
     #[cfg(target_arch = "aarch64")]
@@ -96,7 +98,10 @@ unsafe fn mmio_write(base: usize, off: usize, val: u32) {
     write_volatile((base + off) as *mut u32, val);
 }
 
-pub fn is_initialized() -> bool { false }
+pub fn is_initialized() -> bool {
+    // PL-14 fix: report true only after driver_ok handshake succeeded
+    unsafe { DRIVER_OK_WRITTEN && DEVICE_BASE != 0 }
+}
 
 #[inline(never)]
 pub fn probe() -> Option<(usize, u32)> {
@@ -148,6 +153,8 @@ pub fn init_device(base: usize, ver: u32) -> bool {
                 write_volatile(uart, b'X'); return false;
             }
         }
+        // PL-14 fix: do NOT set FEATURES_OK for v1 legacy (it's undefined for v1
+        // and QEMU may silently reject the status transition, leaving active=false)
         mmio_write(base, OFF_QUEUE_SEL, 0);
         let max = mmio_read(base, OFF_QUEUE_NUM_MAX);
         if max == 0 { write_volatile(uart, b'Q'); return false; }
@@ -185,10 +192,24 @@ pub fn init_device(base: usize, ver: u32) -> bool {
         AVAIL_IDX = QUEUE_SIZE as u16;
         LAST_SEEN = 0;
         dsb();
-        mmio_write(base, OFF_STATUS,
-            STATUS_ACKNOWLEDGE | STATUS_DRIVER | STATUS_FEATURES_OK | STATUS_DRIVER_OK);
+        // PL-14 fix: v1 final status = ACK | DRIVER | DRIVER_OK only (no FEATURES_OK)
+        // v2 final status = ACK | DRIVER | FEATURES_OK | DRIVER_OK
+        let final_status = if ver == 1 {
+            STATUS_ACKNOWLEDGE | STATUS_DRIVER | STATUS_DRIVER_OK
+        } else {
+            STATUS_ACKNOWLEDGE | STATUS_DRIVER | STATUS_FEATURES_OK | STATUS_DRIVER_OK
+        };
+        mmio_write(base, OFF_STATUS, final_status);
+        dsb();
+        // Verify DRIVER_OK is reflected back (QEMU mirrors STATUS register)
+        let status_rb = mmio_read(base, OFF_STATUS);
+        if status_rb & STATUS_DRIVER_OK == 0 {
+            write_volatile(uart, b'D'); // DRIVER_OK not reflected — device rejected
+            return false;
+        }
         mmio_write(base, OFF_QUEUE_NOTIFY, 0);
         DEVICE_BASE = base;
+        DRIVER_OK_WRITTEN = true;
         write_volatile(uart, b'K');
         write_volatile(uart, b'\n');
     }
