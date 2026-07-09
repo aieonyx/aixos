@@ -26,17 +26,22 @@ pub fn init() -> Option<VirtioInput> {
     if virtio_input::init_device(base, ver) { Some(VirtioInput { base }) } else { None }
 }
 
+// Evdev codes for shift keys
+const KEY_LEFTSHIFT:  u16 = 42;
+const KEY_RIGHTSHIFT: u16 = 54;
+
+// Shift state — set on press, cleared on release
+static mut SHIFT_ACTIVE: bool = false;
+
 /// Poll for a key event.
-/// Priority: UART first (primary — reliable via -serial stdio),
-/// then virtio-input (secondary — GTK window focus required).
+/// Priority: UART first (reliable via -serial stdio), then virtio-input.
 pub fn poll() -> Option<KeyEvent> {
-    // UART path: works whenever -serial stdio is active and the terminal
-    // has focus. This is the PL-14 primary path.
+    // UART path
     if let Some(b) = uart_kbd::read_byte() {
         let code: u16 = match b {
-            b'\r' | b'\n' => 28, // ENTER
-            0x1b           => 1,  // ESC
-            0x7f | 0x08    => 14, // BACKSPACE
+            b'\r' | b'\n' => 28,
+            0x1b           => 1,
+            0x7f | 0x08    => 14,
             _              => 0,
         };
         return Some(KeyEvent {
@@ -45,24 +50,71 @@ pub fn poll() -> Option<KeyEvent> {
             ch: if b >= 0x20 && b < 0x7f { Some(b as char) } else { None },
         });
     }
-    // virtio-input path: active only if DRIVER_OK handshake succeeded and
-    // QEMU routes GTK window events to the virtio-keyboard-device.
+
+    // virtio-input path
     if !virtio_input::is_initialized() { return None; }
-    let ev = virtio_input::poll_event()?;
-    Some(KeyEvent { code: ev.code, value: ev.value, ch: evdev_to_char(ev.code) })
+
+    // Drain all pending events, tracking shift state.
+    // Return the first non-modifier key press.
+    loop {
+        let ev = virtio_input::poll_event()?;
+
+        // Track shift key state (press and release)
+        if ev.code == KEY_LEFTSHIFT || ev.code == KEY_RIGHTSHIFT {
+            unsafe {
+                SHIFT_ACTIVE = ev.value == EV_VALUE_PRESS || ev.value == EV_VALUE_REPEAT;
+            }
+            continue; // consume shift event, keep polling
+        }
+
+        // Only deliver key press and repeat events
+        if ev.ev_type != EV_KEY {
+            continue;
+        }
+        if ev.value != EV_VALUE_PRESS && ev.value != EV_VALUE_REPEAT {
+            continue; // discard key release events
+        }
+
+        let shifted = unsafe { SHIFT_ACTIVE };
+        return Some(KeyEvent {
+            code: ev.code,
+            value: ev.value,
+            ch: evdev_to_char(ev.code, shifted),
+        });
+    }
 }
 
-pub fn evdev_to_char(code: u16) -> Option<char> {
-    Some(match code {
-        2=>'1', 3=>'2', 4=>'3', 5=>'4', 6=>'5',
-        7=>'6', 8=>'7', 9=>'8', 10=>'9', 11=>'0',
-        16=>'q', 17=>'w', 18=>'e', 19=>'r', 20=>'t',
-        21=>'y', 22=>'u', 23=>'i', 24=>'o', 25=>'p',
-        30=>'a', 31=>'s', 32=>'d', 33=>'f', 34=>'g',
-        35=>'h', 36=>'j', 37=>'k', 38=>'l',
-        44=>'z', 45=>'x', 46=>'c', 47=>'v', 48=>'b',
-        49=>'n', 50=>'m', 57=>' ',
-        _ => return None,
+pub fn evdev_to_char(code: u16, shift: bool) -> Option<char> {
+    Some(if shift {
+        match code {
+            2=>'!', 3=>'@', 4=>'#', 5=>'$', 6=>'%',
+            7=>'^', 8=>'&', 9=>'*', 10=>'(', 11=>')',
+            16=>'Q', 17=>'W', 18=>'E', 19=>'R', 20=>'T',
+            21=>'Y', 22=>'U', 23=>'I', 24=>'O', 25=>'P',
+            30=>'A', 31=>'S', 32=>'D', 33=>'F', 34=>'G',
+            35=>'H', 36=>'J', 37=>'K', 38=>'L',
+            44=>'Z', 45=>'X', 46=>'C', 47=>'V', 48=>'B',
+            49=>'N', 50=>'M', 57=>' ',
+            12=>'_', 13=>'+', 26=>'{', 27=>'}', 39=>':',
+            40=>'"', 41=>'~', 43=>'|', 51=>'<', 52=>'>',
+            53=>'?',
+            _ => return None,
+        }
+    } else {
+        match code {
+            2=>'1', 3=>'2', 4=>'3', 5=>'4', 6=>'5',
+            7=>'6', 8=>'7', 9=>'8', 10=>'9', 11=>'0',
+            16=>'q', 17=>'w', 18=>'e', 19=>'r', 20=>'t',
+            21=>'y', 22=>'u', 23=>'i', 24=>'o', 25=>'p',
+            30=>'a', 31=>'s', 32=>'d', 33=>'f', 34=>'g',
+            35=>'h', 36=>'j', 37=>'k', 38=>'l',
+            44=>'z', 45=>'x', 46=>'c', 47=>'v', 48=>'b',
+            49=>'n', 50=>'m', 57=>' ',
+            12=>'-', 13=>'=', 26=>'[', 27=>']', 39=>';',
+            40=>'\'', 41=>'`', 43=>'\\', 51=>',', 52=>'.',
+            53=>'/',
+            _ => return None,
+        }
     })
 }
 
@@ -71,29 +123,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn digits_map() {
-        assert_eq!(evdev_to_char(2), Some('1'));
-        assert_eq!(evdev_to_char(11), Some('0'));
+    fn digits_map_unshifted() {
+        assert_eq!(evdev_to_char(2, false), Some('1'));
+        assert_eq!(evdev_to_char(11, false), Some('0'));
     }
 
     #[test]
-    fn letters_map() {
-        assert_eq!(evdev_to_char(30), Some('a'));
-        assert_eq!(evdev_to_char(44), Some('z'));
-        assert_eq!(evdev_to_char(57), Some(' '));
+    fn digits_map_shifted() {
+        assert_eq!(evdev_to_char(2, true), Some('!'));
+        assert_eq!(evdev_to_char(3, true), Some('@'));
+        assert_eq!(evdev_to_char(9, true), Some('*'));
+    }
+
+    #[test]
+    fn letters_unshifted() {
+        assert_eq!(evdev_to_char(30, false), Some('a'));
+        assert_eq!(evdev_to_char(44, false), Some('z'));
+        assert_eq!(evdev_to_char(57, false), Some(' '));
+    }
+
+    #[test]
+    fn letters_shifted() {
+        assert_eq!(evdev_to_char(30, true), Some('A'));
+        assert_eq!(evdev_to_char(44, true), Some('Z'));
+        assert_eq!(evdev_to_char(57, true), Some(' '));
     }
 
     #[test]
     fn control_keys_are_none() {
-        assert_eq!(evdev_to_char(1), None);
-        assert_eq!(evdev_to_char(14), None);
-        assert_eq!(evdev_to_char(28), None);
+        assert_eq!(evdev_to_char(1, false), None);
+        assert_eq!(evdev_to_char(14, false), None);
+        assert_eq!(evdev_to_char(28, false), None);
     }
 
     #[test]
     fn unmapped_are_none() {
-        assert_eq!(evdev_to_char(0), None);
-        assert_eq!(evdev_to_char(u16::MAX), None);
+        assert_eq!(evdev_to_char(0, false), None);
+        assert_eq!(evdev_to_char(u16::MAX, false), None);
     }
 
     #[test]
@@ -101,19 +167,26 @@ mod tests {
         assert_eq!(core::mem::size_of::<VirtioInputEvent>(), 8);
     }
 
-    // PL-14: virtio not initialized before init_device() runs on host tests
     #[test]
     fn virtio_not_initialized_at_startup() {
-        assert!(!virtio_input::is_initialized(),
-            "is_initialized() must return false before init_device() succeeds");
+        assert!(!virtio_input::is_initialized());
     }
 
-    // PL-14: UART read_byte() is cfg-gated on aarch64; on host it always returns None.
     #[test]
     fn uart_kbd_none_on_host() {
-        // cfg-gate ensures no hardware access on x86_64 test host.
-        // read_byte() returns None unconditionally on non-aarch64 targets.
         assert_eq!(uart_kbd::read_byte(), None);
+    }
+
+    #[test]
+    fn shift_gives_uppercase() {
+        assert_eq!(evdev_to_char(18, true), Some('E'));
+        assert_eq!(evdev_to_char(18, false), Some('e'));
+    }
+
+    #[test]
+    fn symbols_unshifted_and_shifted() {
+        assert_eq!(evdev_to_char(12, false), Some('-'));
+        assert_eq!(evdev_to_char(12, true),  Some('_'));
     }
 }
 

@@ -17,23 +17,33 @@ jobs:
 
       - name: Install aarch64 cross toolchain
         run: sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-none
 
-      - name: Build (aarch64 sovereign target)
+      - name: Install Rust toolchain (pinned via rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.94.1"
+          targets: aarch64-unknown-none
+          components: rustfmt, clippy
+
+      - name: Build debug (aarch64 sovereign target)
         run: |
           cargo build --target aarch64-unknown-none \
             -p aixos-kernel -p aixos-identity \
-            -p aixos-shell -p aixos-net -p aixos-init
+            -p aixos-shell -p aixos-net -p aixos-init \
+            -p aixos-input -p aixos-gpu
+
+      - name: Build release (aarch64 sovereign target — verifies PE layout)
+        run: |
+          cargo build --release --target aarch64-unknown-none \
+            -p aixos-init
 
       - name: Test (host target)
         run: |
           cargo test --target x86_64-unknown-linux-gnu \
             --lib \
             -p aixos-kernel -p aixos-identity \
-            -p aixos-shell -p aixos-net -p aixos-init
+            -p aixos-shell -p aixos-net -p aixos-init \
+            -p aixos-input -p aixos-gpu
 
       - name: Clippy (no-deps, aixos crates only)
         run: |
@@ -41,6 +51,7 @@ jobs:
             --no-deps --lib \
             -p aixos-kernel -p aixos-identity \
             -p aixos-shell -p aixos-net -p aixos-init \
+            -p aixos-input \
             -- -D warnings
 
   post-doctrine:

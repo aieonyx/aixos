@@ -1,0 +1,10 @@
+# Copyright (c) 2026 Edison Lepiten / AIEONYX
+# SPDX-License-Identifier: Apache-2.0
+# Pinned to 1.94.1 — proven stable with no_std aarch64-unknown-none,
+# LTO=true, opt-level=z, --strip-debug. Do not float to "stable" —
+# Rust stable updates can reintroduce .eh_frame LOAD section regressions
+# that corrupt the PE layout baked into head_pe.s.
+[toolchain]
+channel = "1.94.1"
+targets = ["aarch64-unknown-none"]
+components = ["rustfmt", "clippy"]
