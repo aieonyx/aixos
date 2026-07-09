@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/first-pixels-pl10.png" alt="aiXos Phoenix — Sovereign Desktop OS" width="100%"/>
+  <img src="assets/phoenix.jpg" alt="aiXos Phoenix - The Sovereign Desktop OS" width="100%"/>
 </p>
 
 <p align="center">
@@ -48,7 +48,6 @@ axon_main() -> 0x4153
 GPU: ok
 Desktop rendered
 axos>
-
 ### What you see on screen
 
 - **Top bar:** `aiXos Phoenix  |  axon_main() -> 0x4153  |  Sovereign`
@@ -69,7 +68,7 @@ _start (boot.s)
 └── aixos_gpu::init() — ramfb via fw_cfg DMA
 └── render_desktop() — three-panel layout
 └── render_status_bar()
-└── shell_loop() — axos> prompt
+└── shell_loop() — aixos> prompt
 ### ISO boot (`bash build/run-iso.sh`)
 EDK2 (UEFI firmware)
 └── BOOTAA64.EFI (PE/COFF EFI stub)
@@ -94,8 +93,8 @@ EDK2 (UEFI firmware)
 | `bastion.ax` | Policy + heartbeat |
 | `boot/aixos-boot.ax` | Boot mode selection |
 | `crates/aixos-gpu/src/desktop.ax` | Desktop layout constants |
-| `crates/aixos-input/src/input.ax` | Key codes |
-| `boot/aixos-boot.ax` | Boot mode constants (live/install/rescue) |
+| `crates/aixos-input/src/input.ax` | Evdev key codes |
+| `boot/aixos-boot.ax` | Boot mode constants |
 
 ---
 
@@ -124,14 +123,14 @@ EDK2 (UEFI firmware)
 - [x] HANIEL sovereign shell surface
 - [x] 10 AXONYX .ax files running in the OS
 - [x] Bootable on QEMU aarch64
-- [x] **First pixels on screen — sovereign purple (#7B4FDB) via ramfb**
+- [x] **First pixels — sovereign purple (#7B4FDB) via ramfb**
 - [x] **Three-panel sovereign desktop — top bar, panels, AIEONYX logo, dock**
 - [x] **8x8 bitmap font rendering — status bar text on screen**
 - [x] **virtio-input keyboard driver — virtqueue initialized (v1 legacy)**
 - [x] **UEFI ISO boot — EDK2 → PE/COFF stub → aiXos Phoenix desktop**
 
 ### aiXos Phoenix Full (v1.0) — Next
-- [ ] Keyboard input delivery (QEMU input routing)
+- [ ] Keyboard input delivery (QEMU input routing fix)
 - [ ] x86_64 port — native Intel/AMD boot
 - [ ] Full AXONYX application layer (zero Rust stubs)
 - [ ] Onyxia browser integrated
@@ -190,7 +189,7 @@ axos>
 | fw_cfg key | 0x0025 = etc/ramfb |
 | virtio-input | slot 31, v1 legacy, device ID 0x12 |
 | Boot formats | ELF (`-kernel`), PE/COFF EFI (ISO) |
-| QEMU command | `-machine virt -cpu cortex-a72 -m 512M` |
+| QEMU | -machine virt -cpu cortex-a72 -m 512M |
 
 ---
 
