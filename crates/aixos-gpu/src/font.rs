@@ -154,3 +154,18 @@ pub fn draw_bytes(x: u32, y: u32, buf: &[u8], color: u32) {
         cx += 8;
     }
 }
+
+/// Render a u32 as 8 hex digits at (x, y).
+pub fn draw_hex32(x: u32, y: u32, val: u32, color: u32) {
+    let hex = b"0123456789abcdef";
+    let mut buf = [0u8; 8];
+    let mut v = val;
+    let mut i = 7usize;
+    loop {
+        buf[i] = hex[(v & 0xf) as usize];
+        v >>= 4;
+        if i == 0 { break; }
+        i -= 1;
+    }
+    draw_bytes(x, y, &buf, color);
+}

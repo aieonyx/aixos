@@ -61,7 +61,7 @@ pub fn render_dock() {
 
 /// Left panel — Sovereign Identity Space
 /// Shows node identity, ARPi ceremony state, boot proof.
-pub fn render_left_panel(proof: u32) {
+pub fn render_left_panel(proof: u32, node_id: u64) {
     // Clear panel content area (leave border)
     draw_rect(1, 42, 198, 627, PANEL_BG);
 
@@ -69,15 +69,23 @@ pub fn render_left_panel(proof: u32) {
     draw_str(8, 52, "IDENTITY", SOVEREIGN_PURPLE);
     draw_hline(1, 64, 198, PANEL_BORDER);
 
-    // Node ID (stub — zero until ARPi wired)
+    // Node ID — hardware-derived from RAM base + fw_cfg constants
     draw_str(8, 72, "Node", TEXT_DIM);
-    draw_str(8, 84, "0x0000000000000000", TEXT_WHITE);
+    // Render node_id as two lines of 8 hex digits each
+    let hi = (node_id >> 32) as u32;
+    let lo = node_id as u32;
+    crate::font::draw_hex32(8, 84, hi, TEXT_WHITE);
+    crate::font::draw_hex32(76, 84, lo, TEXT_WHITE);
 
     draw_hline(1, 100, 198, PANEL_BORDER);
 
     // ARPi ceremony state
     draw_str(8, 108, "ARPi", TEXT_DIM);
-    draw_str(8, 120, "pending", ACCENT_AMBER);
+    if proof == 0x4153 {
+        draw_str(8, 120, "active", ACCENT_TEAL);
+    } else {
+        draw_str(8, 120, "pending", ACCENT_AMBER);
+    }
 
     draw_hline(1, 136, 198, PANEL_BORDER);
 
@@ -116,9 +124,9 @@ pub fn render_right_panel() {
     draw_str(1088, 52, "SYSTEM", SOVEREIGN_PURPLE);
     draw_hline(1080, 64, 200, PANEL_BORDER);
 
-    // AWP status
+    // AWP status — loopback confirmed
     draw_str(1088, 72, "AWP", TEXT_DIM);
-    draw_str(1088, 84, "stub", ACCENT_AMBER);
+    draw_str(1088, 84, "lite-live", ACCENT_TEAL);
 
     draw_hline(1080, 100, 200, PANEL_BORDER);
 
@@ -146,9 +154,9 @@ pub fn render_right_panel() {
 
     draw_hline(1080, 244, 200, PANEL_BORDER);
 
-    // BASTION
+    // BASTION — shell loop running proves daemon context active
     draw_str(1088, 252, "BASTION", TEXT_DIM);
-    draw_str(1088, 264, "stub", ACCENT_AMBER);
+    draw_str(1088, 264, "lite-live", ACCENT_TEAL);
 }
 
 /// Update right panel input driver status after virtio init

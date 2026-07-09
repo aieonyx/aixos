@@ -75,7 +75,7 @@ pub extern "C" fn aixos_main() -> ! {
             uart_write("GPU: ok\n");
             aixos_gpu::desktop::render_desktop();
             // Render panel content immediately after desktop
-            aixos_gpu::desktop::render_left_panel(proof);
+            aixos_gpu::desktop::render_left_panel(proof, aixos_identity::node_id());
             aixos_gpu::desktop::render_right_panel();
             // Status bar reflects actual proof state
             if proof == 0x4153 {
