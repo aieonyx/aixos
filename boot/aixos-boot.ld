@@ -46,4 +46,15 @@ SECTIONS
 
     /* Framebuffer — separate memory region */
     .fb (NOLOAD) : { *(.fb) } > FBMEM
+
+    /* Discard exception-handling unwind tables — not needed in bare-metal.
+       Without this, .eh_frame/.eh_frame_hdr become LOAD sections that shift
+       .bss and corrupt the PE layout baked into head_pe.s. */
+    /DISCARD/ : {
+        *(.eh_frame)
+        *(.eh_frame_hdr)
+        *(.note*)
+        *(.ARM.exidx*)
+        *(.ARM.extab*)
+    }
 }
