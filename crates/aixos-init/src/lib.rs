@@ -24,7 +24,7 @@ pub fn orchestrate() -> u32 {
     let bastion = BastionPd::new();
     let proof = boot_sequence(&[&genesis, &arpi, &awp, &shell, &bastion]);
     render_banner();
-    render_node_id(0);
+    render_node_id(aixos_identity::node_id());
     render_awp_status(false);
     render_proof(proof);
     render_prompt();
@@ -40,8 +40,13 @@ mod tests {
     #[test]
     fn boot_banner_is_set() { assert!(!BOOT_BANNER.is_empty()); }
     #[test]
-    fn orchestrate_returns_zero_before_pds_live() {
-        assert_eq!(orchestrate(), 0);
+    fn orchestrate_proof_reflects_pd_state() {
+        // In host test environment: SovereignShell::handshake() calls
+        // render_sovereign_surface() which returns false (haniel stub).
+        // So boot_sequence() returns 0 — correct for host test context.
+        // On bare-metal: all 5 PDs return true → proof = 0x4153.
+        let proof = orchestrate();
+        assert!(proof == 0 || proof == aixos_kernel::AXON_PROOF);
     }
     #[test]
     fn proof_line_carries_value() {
