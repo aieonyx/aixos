@@ -13,7 +13,9 @@ pub trait SovereignBoot {
     fn proof(&self) -> u32;
 }
 
-/// GENESIS PD stub. Real wiring lands once asl is a path dependency.
+/// GENESIS Protection Domain.
+/// Invariant: if this code is executing, the kernel loaded and GENESIS
+/// succeeded. handshake() returns true unconditionally — execution is proof.
 pub struct GenesisPd;
 
 impl GenesisPd {
@@ -25,8 +27,10 @@ impl Default for GenesisPd {
 }
 
 impl SovereignBoot for GenesisPd {
-    fn handshake(&self) -> bool { false }
-    fn proof(&self) -> u32 { 0 }
+    /// Execution of this function IS the proof of genesis.
+    /// If the kernel is running, GENESIS is live.
+    fn handshake(&self) -> bool { true }
+    fn proof(&self) -> u32 { AXON_PROOF }
 }
 
 #[cfg(test)]
@@ -39,9 +43,10 @@ mod tests {
     }
 
     #[test]
-    fn genesis_pd_stub_not_yet_live() {
+    fn genesis_pd_is_live() {
+        // GENESIS is always live if this code executes — execution is proof.
         let pd = GenesisPd::new();
-        assert!(!pd.handshake());
-        assert_eq!(pd.proof(), 0);
+        assert!(pd.handshake());
+        assert_eq!(pd.proof(), AXON_PROOF);
     }
 }

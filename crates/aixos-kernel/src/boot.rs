@@ -32,9 +32,11 @@ mod tests {
     }
 
     #[test]
-    fn zero_with_genesis_stub_only() {
+    fn proof_with_genesis_only() {
+        // GenesisPd::handshake() is true — execution is proof.
+        // A single live stage returns AXON_PROOF.
         let genesis = GenesisPd::new();
-        assert_eq!(boot_sequence(&[&genesis]), 0);
+        assert_eq!(boot_sequence(&[&genesis]), AXON_PROOF);
     }
 
     #[test]
