@@ -71,8 +71,12 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 #[no_mangle]
 pub extern "C" fn aixos_main() -> ! {
     uart_write("aiXos Phoenix - Sovereign Stack Initializing...\n");
-    aixos_init::orchestrate();
-    uart_write("axon_main() -> 0x4153\n");
+    let proof = aixos_init::orchestrate();
+    if proof == 0x4153 {
+        uart_write("axon_main() -> 0x4153 [SOVEREIGN]\n");
+    } else {
+        uart_write("axon_main() -> boot incomplete\n");
+    }
 
     // Brief delay for display initialization
     let mut delay = 0u64;
@@ -83,7 +87,11 @@ pub extern "C" fn aixos_main() -> ! {
             uart_write("GPU: ok\n");
             aixos_gpu::desktop::render_desktop();
             aixos_gpu::desktop::render_status_bar(
-                "aiXos Phoenix  |  axon_main() -> 0x4153  |  Sovereign");
+                if proof == 0x4153 {
+                "aiXos Phoenix  |  axon_main() -> 0x4153  |  Sovereign"
+            } else {
+                "aiXos Phoenix  |  boot incomplete  |  check PDs"
+            });
             aixos_gpu::desktop::render_dock();
             uart_write("Desktop rendered\n");
         }
