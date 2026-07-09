@@ -53,6 +53,11 @@ jobs:
             -p aixos-shell -p aixos-net -p aixos-init \
             -p aixos-input \
             -- -D warnings
+      - name: Clippy (aixos-gpu, warnings allowed)
+        run: |
+          cargo clippy --target aarch64-unknown-none \
+            --no-deps --lib \
+            -p aixos-gpu
 
   post-doctrine:
     runs-on: ubuntu-latest
