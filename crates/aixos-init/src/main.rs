@@ -38,7 +38,7 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
     match cmd {
         b"help" =>
-            "help clear version sovereignty node-id awp-status mem reboot",
+            "help clear version sovereignty node-id awp-status mem window close reboot",
         b"clear" => "axos> ",
         b"version" => "aiXos Phoenix v0.1.0 — Sovereign Stack",
         b"sovereignty" =>
@@ -50,10 +50,27 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
             uart_write("axos> reboot\n");
             loop {}
         }
+        b"window" => {
+            unsafe { WINDOW_OPEN = true; }
+            aixos_gpu::desktop::render_window(
+                "Sovereign Node — aiXos Phoenix",
+                &["aiXos Phoenix v0.1.0","Arch:    aarch64 (QEMU virt)",
+                  "Proof:   0x4153 [SOVEREIGN]","Node:    a1e04851 40100001",
+                  "ARPi:    active  AWP: lite-live","Input:   virtio+uart",
+                  "Display: ramfb 1280x720","","type close to dismiss"]);
+            "window opened"
+        }
+        b"close" => {
+            unsafe { if WINDOW_OPEN { WINDOW_OPEN = false;
+                aixos_gpu::desktop::clear_window(); "window closed"
+                } else { "no window open" } }
+        }
         b"" => "",
         _ => "axos: command not found",
     }
 }
+
+static mut WINDOW_OPEN: bool = false;
 
 #[no_mangle]
 pub extern "C" fn aixos_main() -> ! {
