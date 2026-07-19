@@ -56,7 +56,16 @@ pub fn render_status_bar(text: &str) {
 }
 
 pub fn render_dock() {
-    draw_str(350, 682, "axos>", TEXT_WHITE);
+    // Node icon
+    draw_rect(360, 674, 80, 36, ACCENT_TEAL);
+    draw_str(376, 686, "Node", TEXT_WHITE);
+    // Shell icon
+    draw_rect(460, 674, 80, 36, ACCENT_AMBER);
+    draw_str(476, 686, "Shell", TEXT_WHITE);
+    // EDB icon
+    draw_rect(560, 674, 80, 36, SOVEREIGN_PURPLE);
+    draw_str(576, 686, "EDB", TEXT_WHITE);
+    // prompt label
 }
 
 /// Left panel — Sovereign Identity Space
@@ -174,17 +183,15 @@ pub fn render_right_panel_input(virtio_ok: bool) {
 }
 
 pub fn render_input_line(buf: &[u8], len: usize) {
-    draw_rect(340, 670, 600, 50, DOCK_BG);
-    draw_border(340, 670, 600, 50, PANEL_BORDER);
-    draw_str(348, 682, "axos> ", TEXT_DIM);
+    draw_rect(340, 710, 600, 10, DOCK_BG);
+    draw_str(348, 712, "axos> ", TEXT_DIM);
     let n = if len < buf.len() { len } else { buf.len() };
     crate::font::draw_bytes(398, 682, &buf[..n], TEXT_WHITE);
 }
 
 pub fn render_command_result(msg: &str) {
-    draw_rect(340, 670, 600, 50, DOCK_BG);
-    draw_border(340, 670, 600, 50, PANEL_BORDER);
-    draw_str(348, 682, msg, ACCENT_TEAL);
+    draw_rect(340, 710, 600, 10, DOCK_BG);
+    draw_str(348, 712, msg, ACCENT_TEAL);
 }
 
 #[allow(dead_code)]
@@ -207,6 +214,16 @@ pub fn set_window_pos(x: i32, y: i32) {
 }
 pub fn get_window_pos() -> (i32, i32) {
     unsafe { (CUR_WIN_X, CUR_WIN_Y) }
+}
+
+pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
+    if y < 674 || y >= 710 {
+        return None;
+    }
+    if x >= 360 && x < 440 { return Some(0); }
+    if x >= 460 && x < 540 { return Some(1); }
+    if x >= 560 && x < 640 { return Some(2); }
+    None
 }
 
 pub fn render_window(title: &str, lines: &[&str]) {

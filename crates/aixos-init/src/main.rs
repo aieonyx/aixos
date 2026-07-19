@@ -58,13 +58,8 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
             }
         }
         b"window" => {
-            unsafe { WINDOW_OPEN = true; }
-            aixos_gpu::desktop::render_window(
-                "Sovereign Node — aiXos Phoenix",
-                &["aiXos Phoenix v0.1.0","Arch:    aarch64 (QEMU virt)",
-                  "Proof:   0x4153 [SOVEREIGN]","Node:    a1e04851 40100001",
-                  "ARPi:    active  AWP: lite-live","Input:   virtio+uart",
-                  "Display: ramfb 1280x720","","type close to dismiss"]);
+            unsafe { WINDOW_OPEN = true; WINDOW_KIND = 0; }
+            render_current_window();
             "window opened"
         }
         b"close" => {
@@ -78,6 +73,7 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 }
 
 static mut WINDOW_OPEN: bool = false;
+static mut WINDOW_KIND: u8 = 0;
 static mut DRAG_ACTIVE: bool = false;
 static mut DRAG_OFF_X: i32 = 0;
 static mut DRAG_OFF_Y: i32 = 0;
@@ -147,6 +143,38 @@ pub extern "C" fn aixos_main() -> ! {
     shell_loop(mouse, mouse_state);
 }
 
+fn render_current_window() {
+    let kind = unsafe { WINDOW_KIND };
+    match kind {
+        1 => aixos_gpu::desktop::render_window(
+            "Shell - aiXos Phoenix",
+            &["axos> sovereign shell", "type commands below", "",
+              "PL-24: shell window stub"]),
+        2 => aixos_gpu::desktop::render_window(
+            "EdisonDB - Sovereign Store",
+            &["Status: live", "Entries: (see db command)",
+              "boot:proof = 0x4153", "boot:node_id = stored",
+              "Tier: Critical / Personal / Noise"]),
+        _ => aixos_gpu::desktop::render_window(
+            "Sovereign Node - aiXos Phoenix",
+            &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
+              "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"]),
+    }
+}
+
+fn handle_dock_click(x: i32, y: i32) {
+    if let Some(icon) = aixos_gpu::desktop::dock_icon_at(x, y) {
+        unsafe {
+            if WINDOW_OPEN {
+                aixos_gpu::desktop::clear_window();
+            }
+            WINDOW_KIND = icon;
+            WINDOW_OPEN = true;
+        }
+        render_current_window();
+    }
+}
+
 fn handle_click(x: i32, y: i32) {
     unsafe {
         let (wx, wy) = aixos_gpu::desktop::get_window_pos();
@@ -159,10 +187,8 @@ fn handle_click(x: i32, y: i32) {
         if y > 40 && y < 670 && x > 200 && x < 1080 {
             if !WINDOW_OPEN {
                 WINDOW_OPEN = true;
-                aixos_gpu::desktop::render_window(
-                    "Sovereign Node - aiXos Phoenix",
-                    &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
-                      "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"]);
+                WINDOW_KIND = 0;
+                render_current_window();
             }
         }
     }
@@ -190,17 +216,18 @@ fn shell_loop(
                         if nx != wx || ny != wy {
                             aixos_gpu::desktop::clear_window();
                             aixos_gpu::desktop::set_window_pos(nx, ny);
-                            aixos_gpu::desktop::render_window(
-                                "Sovereign Node - aiXos Phoenix",
-                                &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
-                                  "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"]);
+                            render_current_window();
                         }
                     }
                     if !mouse_state.left { DRAG_ACTIVE = false; }
                 }
                 aixos_gpu::draw_cursor(mouse_state.x, mouse_state.y);
                 if mouse_state.left && !prev_left {
-                    handle_click(mouse_state.x, mouse_state.y);
+                    if mouse_state.y > 670 {
+                        handle_dock_click(mouse_state.x, mouse_state.y);
+                    } else {
+                        handle_click(mouse_state.x, mouse_state.y);
+                    }
                 }
             }
         }
