@@ -222,7 +222,7 @@ pub fn render_window(title: &str, lines: &[&str]) {
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
     draw_str(wx + 22, wy + 8, title, TEXT_WHITE);
-    draw_str(wx + WIN_W - 52, wy + 8, "[close]", 0x666688);
+    draw_str(wx + WIN_W - 62, wy + 8, "[close]", 0x666688);
     draw_hline(wx, wy + WIN_TITLE_H, WIN_W, ACCENT_TEAL);
     draw_rect(wx, wy + WIN_TITLE_H + 1, WIN_W, WIN_H - WIN_TITLE_H - 1, WIN_BG);
     let mut row = 0u32;
@@ -235,6 +235,6 @@ pub fn render_window(title: &str, lines: &[&str]) {
 pub fn clear_window() {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
-    draw_rect(wx.saturating_sub(1), wy.saturating_sub(1), WIN_W + 2, WIN_H + 2, DARK_BG);
-    blend_rect(wx.saturating_sub(1), wy.saturating_sub(1), WIN_W + 2, WIN_H + 2, SOVEREIGN_PURPLE, 28);
+    draw_rect(wx.saturating_sub(2), wy.saturating_sub(2), WIN_W + 10, WIN_H + 4, DARK_BG);
+    blend_rect(wx.saturating_sub(2), wy.saturating_sub(2), WIN_W + 10, WIN_H + 4, SOVEREIGN_PURPLE, 28);
 }
