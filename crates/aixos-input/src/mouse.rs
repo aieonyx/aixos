@@ -106,7 +106,7 @@ pub fn init() -> Option<VirtioMouse> {
 
 fn setup(base: usize) -> VirtioMouse {
     let ring = unsafe { addr_of_mut!(RING.0) as *mut u8 };
-    let evs = unsafe { addr_of_mut!(EVENTS) as *mut InputEvent };
+    let evs = addr_of_mut!(EVENTS) as *mut InputEvent;
     w32(base, R_STATUS, 0);
     w32(base, R_STATUS, 1);
     w32(base, R_STATUS, 3);
@@ -128,7 +128,7 @@ fn setup(base: usize) -> VirtioMouse {
         }
         write_volatile(avail.add(2) as *mut u16, QUEUE_SIZE as u16);
     }
-    w32(base, R_QUEUE_PFN, ((unsafe { addr_of!(RING) } as usize) >> 12) as u32);
+    w32(base, R_QUEUE_PFN, (addr_of!(RING) as usize >> 12) as u32);
     w32(base, R_STATUS, 7);
     w32(base, R_NOTIFY, 0);
     VirtioMouse { base, last_used: 0, avail_idx: QUEUE_SIZE as u16 }
@@ -136,7 +136,7 @@ fn setup(base: usize) -> VirtioMouse {
 
 impl VirtioMouse {
     fn ring_base(&self) -> usize {
-        unsafe { addr_of!(RING) as usize }
+        addr_of!(RING) as usize
     }
 
     fn used_idx(&self) -> u16 {
