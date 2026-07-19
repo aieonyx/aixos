@@ -50,6 +50,13 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
             uart_write("axos> reboot\n");
             loop {}
         }
+        b"db" => {
+            if aixos_edisondb::is_live() {
+                "EdisonDB: live | sovereign store active"
+            } else {
+                "EdisonDB: stub"
+            }
+        }
         b"window" => {
             unsafe { WINDOW_OPEN = true; }
             aixos_gpu::desktop::render_window(
@@ -90,6 +97,13 @@ pub extern "C" fn aixos_main() -> ! {
     while delay < 10_000_000 { delay += 1; }
 
     let virtio_ok;
+    aixos_edisondb::init();
+    aixos_edisondb::write("boot:node_id", aixos_identity::node_id(), aixos_edisondb::Tier::Critical);
+    aixos_edisondb::log_event("boot:desktop_ready");
+    if aixos_edisondb::is_live() {
+        uart_write("EdisonDB: live\n");
+    }
+
     match aixos_gpu::init() {
         Some(_) => {
             uart_write("GPU: ok\n");

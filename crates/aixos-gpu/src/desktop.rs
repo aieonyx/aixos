@@ -132,7 +132,11 @@ pub fn render_right_panel() {
 
     // EdisonDB
     draw_str(1088, 108, "EdisonDB", TEXT_DIM);
-    draw_str(1088, 120, "stub", ACCENT_AMBER);
+    if aixos_edisondb::is_live() {
+        draw_str(1088, 120, "live", ACCENT_TEAL);
+    } else {
+        draw_str(1088, 120, "stub", ACCENT_AMBER);
+    }
 
     draw_hline(1080, 136, 200, PANEL_BORDER);
 

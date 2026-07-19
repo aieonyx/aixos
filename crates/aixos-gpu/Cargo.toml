@@ -10,4 +10,5 @@ name = "aixos_gpu"
 path = "src/lib.rs"
 
 [dependencies]
+aixos-edisondb = { path = "../aixos-edisondb" }
 aixos-kernel = { path = "../aixos-kernel" }
