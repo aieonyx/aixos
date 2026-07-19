@@ -253,6 +253,31 @@ pub fn render_window(title: &str, lines: &[&str]) {
     }
 }
 
+pub fn render_window_output(wx: i32, wy: i32, lines: &[&'static str], count: usize) {
+    draw_rect((wx + 4) as u32, (wy + 25) as u32, 572, 254, WIN_BG);
+    let n = if count > 8 { 8 } else { count };
+    let mut y = wy + 36;
+    let mut idx = 0;
+    while idx < n {
+        draw_str((wx + 8) as u32, y as u32, lines[idx], TEXT_WHITE);
+        y += 18;
+        idx += 1;
+    }
+}
+
+pub fn render_window_input(wx: i32, wy: i32, buf: &[u8], len: usize, focused: bool) {
+    let y = wy + 280;
+    draw_rect((wx + 4) as u32, (y - 2) as u32, 572, 18, WIN_BG);
+    draw_str((wx + 8) as u32, y as u32, "win> ", ACCENT_TEAL);
+    if let Ok(txt) = core::str::from_utf8(&buf[..len]) {
+        draw_str((wx + 48) as u32, y as u32, txt, TEXT_WHITE);
+    }
+    draw_str((wx + 48 + (len as i32) * 8) as u32, y as u32, "_", TEXT_WHITE);
+    if focused {
+        draw_str((wx + 500) as u32, y as u32, "[focused]", TEXT_DIM);
+    }
+}
+
 pub fn clear_window() {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
