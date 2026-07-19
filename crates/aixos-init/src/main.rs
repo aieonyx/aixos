@@ -71,6 +71,9 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 }
 
 static mut WINDOW_OPEN: bool = false;
+static mut DRAG_ACTIVE: bool = false;
+static mut DRAG_OFF_X: i32 = 0;
+static mut DRAG_OFF_Y: i32 = 0;
 
 #[no_mangle]
 pub extern "C" fn aixos_main() -> ! {
@@ -131,12 +134,19 @@ pub extern "C" fn aixos_main() -> ! {
 }
 
 fn handle_click(x: i32, y: i32) {
-    if y > 40 && y < 670 && x > 200 && x < 1080 {
-        unsafe {
+    unsafe {
+        let (wx, wy) = aixos_gpu::desktop::get_window_pos();
+        if WINDOW_OPEN && x >= wx && x < wx + 580 && y >= wy && y < wy + 24 {
+            DRAG_ACTIVE = true;
+            DRAG_OFF_X = x - wx;
+            DRAG_OFF_Y = y - wy;
+            return;
+        }
+        if y > 40 && y < 670 && x > 200 && x < 1080 {
             if !WINDOW_OPEN {
                 WINDOW_OPEN = true;
                 aixos_gpu::desktop::render_window(
-                    "Sovereign Node \u{2014} aiXos Phoenix",
+                    "Sovereign Node - aiXos Phoenix",
                     &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
                       "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"]);
             }
@@ -157,6 +167,23 @@ fn shell_loop(
             let prev_left = mouse_state.left;
             if m.poll(&mut mouse_state) {
                 aixos_gpu::erase_cursor(old_x, old_y);
+                unsafe {
+                    const DRAG_MIN_X: i32 = 200; const DRAG_MAX_X: i32 = 500;
+                    if DRAG_ACTIVE && mouse_state.left {
+                        let (wx, wy) = aixos_gpu::desktop::get_window_pos();
+                        let nx = (mouse_state.x - DRAG_OFF_X).clamp(DRAG_MIN_X, DRAG_MAX_X);
+                        let ny = (mouse_state.y - DRAG_OFF_Y).clamp(40, 368);
+                        if nx != wx || ny != wy {
+                            aixos_gpu::desktop::clear_window();
+                            aixos_gpu::desktop::set_window_pos(nx, ny);
+                            aixos_gpu::desktop::render_window(
+                                "Sovereign Node - aiXos Phoenix",
+                                &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
+                                  "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"]);
+                        }
+                    }
+                    if !mouse_state.left { DRAG_ACTIVE = false; }
+                }
                 aixos_gpu::draw_cursor(mouse_state.x, mouse_state.y);
                 if mouse_state.left && !prev_left {
                     handle_click(mouse_state.x, mouse_state.y);

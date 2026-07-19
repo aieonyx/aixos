@@ -195,11 +195,23 @@ const WIN_TITLE_H: u32 = 24;
 const WIN_BG:    u32 = 0x0D0D22;
 const WIN_TITLE: u32 = 0x1A1A3A;
 
+static mut CUR_WIN_X: i32 = 340;
+static mut CUR_WIN_Y: i32 = 110;
+
+pub fn set_window_pos(x: i32, y: i32) {
+    unsafe { CUR_WIN_X = x; CUR_WIN_Y = y; }
+}
+pub fn get_window_pos() -> (i32, i32) {
+    unsafe { (CUR_WIN_X, CUR_WIN_Y) }
+}
+
 pub fn render_window(title: &str, lines: &[&str]) {
-    draw_rect(WIN_X.saturating_sub(1), WIN_Y.saturating_sub(1), WIN_W + 2, WIN_H + 2, ACCENT_TEAL);
-    draw_rect(WIN_X, WIN_Y, WIN_W, WIN_TITLE_H, WIN_TITLE);
-    let tx = WIN_X + 8;
-    let ty = WIN_Y + 12;
+    let wx = unsafe { CUR_WIN_X as u32 };
+    let wy = unsafe { CUR_WIN_Y as u32 };
+    draw_rect(wx.saturating_sub(1), wy.saturating_sub(1), WIN_W + 2, WIN_H + 2, ACCENT_TEAL);
+    draw_rect(wx, wy, WIN_W, WIN_TITLE_H, WIN_TITLE);
+    let tx = wx + 8;
+    let ty = wy + 12;
     draw_hline(tx,                   ty.saturating_sub(4), 1, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(1), ty.saturating_sub(3), 3, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(2), ty.saturating_sub(2), 5, SOVEREIGN_PURPLE);
@@ -209,18 +221,20 @@ pub fn render_window(title: &str, lines: &[&str]) {
     draw_hline(tx.saturating_sub(2), ty + 2,               5, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
-    draw_str(WIN_X + 22, WIN_Y + 8, title, TEXT_WHITE);
-    draw_str(WIN_X + WIN_W - 52, WIN_Y + 8, "[close]", 0x666688);
-    draw_hline(WIN_X, WIN_Y + WIN_TITLE_H, WIN_W, ACCENT_TEAL);
-    draw_rect(WIN_X, WIN_Y + WIN_TITLE_H + 1, WIN_W, WIN_H - WIN_TITLE_H - 1, WIN_BG);
+    draw_str(wx + 22, wy + 8, title, TEXT_WHITE);
+    draw_str(wx + WIN_W - 52, wy + 8, "[close]", 0x666688);
+    draw_hline(wx, wy + WIN_TITLE_H, WIN_W, ACCENT_TEAL);
+    draw_rect(wx, wy + WIN_TITLE_H + 1, WIN_W, WIN_H - WIN_TITLE_H - 1, WIN_BG);
     let mut row = 0u32;
     for line in lines.iter().take(10) {
-        draw_str(WIN_X + 12, WIN_Y + WIN_TITLE_H + 12 + row * 18, line, TEXT_WHITE);
+        draw_str(wx + 12, wy + WIN_TITLE_H + 12 + row * 18, line, TEXT_WHITE);
         row += 1;
     }
 }
 
 pub fn clear_window() {
-    draw_rect(WIN_X.saturating_sub(1), WIN_Y.saturating_sub(1), WIN_W + 2, WIN_H + 2, DARK_BG);
-    blend_rect(WIN_X.saturating_sub(1), WIN_Y.saturating_sub(1), WIN_W + 2, WIN_H + 2, SOVEREIGN_PURPLE, 28);
+    let wx = unsafe { CUR_WIN_X as u32 };
+    let wy = unsafe { CUR_WIN_Y as u32 };
+    draw_rect(wx.saturating_sub(1), wy.saturating_sub(1), WIN_W + 2, WIN_H + 2, DARK_BG);
+    blend_rect(wx.saturating_sub(1), wy.saturating_sub(1), WIN_W + 2, WIN_H + 2, SOVEREIGN_PURPLE, 28);
 }
