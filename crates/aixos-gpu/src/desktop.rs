@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect};
-use crate::font::draw_str;
+use crate::font::{draw_str, draw_str_2x};
 
 const DARK_BG:          u32 = 0x0A0A1A;
 const PANEL_BG:         u32 = 0x141428;
@@ -52,19 +52,19 @@ pub fn render_desktop() {
 }
 
 pub fn render_status_bar(text: &str) {
-    draw_str(16, 16, text, TEXT_WHITE);
+    draw_str_2x(16, 12, text, TEXT_WHITE);
 }
 
 pub fn render_dock() {
     // Node icon
     draw_rect(360, 674, 80, 36, ACCENT_TEAL);
-    draw_str(376, 686, "Node", TEXT_WHITE);
+    draw_str_2x(368, 683, "Node", TEXT_WHITE);
     // Shell icon
     draw_rect(460, 674, 80, 36, ACCENT_AMBER);
-    draw_str(476, 686, "Shell", TEXT_WHITE);
+    draw_str_2x(461, 683, "Shell", TEXT_WHITE);
     // EDB icon
     draw_rect(560, 674, 80, 36, SOVEREIGN_PURPLE);
-    draw_str(576, 686, "EDB", TEXT_WHITE);
+    draw_str_2x(568, 683, "EDB", TEXT_WHITE);
     // prompt label
 }
 
