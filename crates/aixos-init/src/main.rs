@@ -118,14 +118,51 @@ pub extern "C" fn aixos_main() -> ! {
         aixos_gpu::desktop::render_right_panel_input(false);
     }
 
+    let mut mouse = aixos_input::mouse::init();
+    let mut mouse_state = aixos_input::mouse::MouseState { x: 640, y: 360, left: false, right: false };
+    if mouse.is_some() {
+        uart_write("Mouse: virtio-tablet\n");
+        aixos_gpu::draw_cursor(mouse_state.x, mouse_state.y);
+    } else {
+        uart_write("Mouse: none\n");
+    }
     uart_write("axos> ");
-    shell_loop();
+    shell_loop(mouse, mouse_state);
 }
 
-fn shell_loop() -> ! {
+fn handle_click(x: i32, y: i32) {
+    if y > 40 && y < 670 && x > 200 && x < 1080 {
+        unsafe {
+            if !WINDOW_OPEN {
+                WINDOW_OPEN = true;
+                aixos_gpu::desktop::render_window(
+                    "Sovereign Node \u{2014} aiXos Phoenix",
+                    &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
+                      "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"]);
+            }
+        }
+    }
+}
+
+fn shell_loop(
+    mut mouse: Option<aixos_input::mouse::VirtioMouse>,
+    mut mouse_state: aixos_input::mouse::MouseState,
+) -> ! {
     let mut buf = ShellBuf::new();
     aixos_gpu::desktop::render_input_line(b"", 0);
     loop {
+        if let Some(ref mut m) = mouse {
+            let old_x = mouse_state.x;
+            let old_y = mouse_state.y;
+            let prev_left = mouse_state.left;
+            if m.poll(&mut mouse_state) {
+                aixos_gpu::erase_cursor(old_x, old_y);
+                aixos_gpu::draw_cursor(mouse_state.x, mouse_state.y);
+                if mouse_state.left && !prev_left {
+                    handle_click(mouse_state.x, mouse_state.y);
+                }
+            }
+        }
         if let Some(ev) = aixos_input::poll() {
             handle_key(&mut buf, ev.code, ev.ch);
         }

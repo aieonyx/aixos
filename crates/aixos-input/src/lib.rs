@@ -3,6 +3,7 @@
 
 #![cfg_attr(not(test), no_std)]
 
+pub mod mouse;
 pub mod virtio_input;
 pub mod uart_kbd;
 

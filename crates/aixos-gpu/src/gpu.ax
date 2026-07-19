@@ -15,3 +15,7 @@ fn resolution_width() -> i64 {
 fn resolution_height() -> i64 {
     return 720;
 }
+
+// cursor dimensions for sovereign desktop compositor
+fn cursor_width() -> i64 { return 12; }
+fn cursor_height() -> i64 { return 20; }

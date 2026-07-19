@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), no_std)]
 
 pub mod commands;
+pub mod cursor;
 pub mod draw;
 pub mod desktop;
 pub mod font;
@@ -169,6 +170,32 @@ pub fn flush(_x: u32, _y: u32, _w: u32, _h: u32) {
         }
     }
 }
+
+#[cfg(not(test))]
+fn fb_slice() -> &'static mut [u32] {
+    unsafe {
+        core::slice::from_raw_parts_mut(
+            framebuffer::fb_addr() as *mut u32,
+            (framebuffer::WIDTH as usize) * (framebuffer::HEIGHT as usize),
+        )
+    }
+}
+
+#[cfg(not(test))]
+pub fn draw_cursor(x: i32, y: i32) {
+    cursor::draw_cursor(fb_slice(), framebuffer::WIDTH as usize, x, y);
+    framebuffer::cache_flush();
+}
+#[cfg(test)]
+pub fn draw_cursor(_x: i32, _y: i32) {}
+
+#[cfg(not(test))]
+pub fn erase_cursor(x: i32, y: i32) {
+    cursor::erase_cursor(fb_slice(), framebuffer::WIDTH as usize, x, y);
+    framebuffer::cache_flush();
+}
+#[cfg(test)]
+pub fn erase_cursor(_x: i32, _y: i32) {}
 
 #[cfg(test)]
 mod tests {

@@ -16,7 +16,6 @@ qemu-system-aarch64 \
     -m 512M \
     -vga none \
     -device ramfb \
-    -device virtio-keyboard-device \
     -display gtk \
     -serial stdio \
     -kernel boot/aixos.elf \

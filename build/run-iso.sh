@@ -21,6 +21,7 @@ qemu-system-aarch64 \
     -vga none \
     -device ramfb \
     -device virtio-keyboard-device \
+    -device virtio-tablet-device \
     -device virtio-blk-device,drive=hd0 \
     -drive if=none,file="$ISO",format=raw,id=hd0,readonly=on \
     -display gtk \
