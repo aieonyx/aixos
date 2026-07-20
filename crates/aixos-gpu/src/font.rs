@@ -195,3 +195,12 @@ pub fn draw_str_2x(x: u32, y: u32, s: &str, color: u32) {
         cx += 17;
     }
 }
+
+pub fn draw_str_clipped(x: u32, y: u32, s: &str, color: u32, max_x: u32) {
+    let mut cx = x;
+    for c in s.chars() {
+        if cx + 8 > max_x { break; }
+        draw_char(cx, y, c, color);
+        cx += 9;
+    }
+}

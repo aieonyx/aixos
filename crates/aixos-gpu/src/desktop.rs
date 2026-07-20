@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect};
-use crate::font::{draw_str, draw_str_2x};
+use crate::font::{draw_str, draw_str_2x, draw_str_clipped};
 
 const DARK_BG:          u32 = 0x0A0A1A;
 const PANEL_BG:         u32 = 0x141428;
@@ -254,12 +254,12 @@ pub fn render_window(title: &str, lines: &[&str]) {
 }
 
 pub fn render_window_output(wx: i32, wy: i32, lines: &[&'static str], count: usize) {
-    draw_rect((wx + 4) as u32, (wy + 25) as u32, 572, 254, WIN_BG);
+    draw_rect((wx + 1) as u32, (wy + 25) as u32, 578, 253, WIN_BG);
     let n = if count > 8 { 8 } else { count };
-    let mut y = wy + 36;
+    let mut y = wy + 30;
     let mut idx = 0;
     while idx < n {
-        draw_str((wx + 8) as u32, y as u32, lines[idx], TEXT_WHITE);
+        draw_str_clipped((wx + 8) as u32, y as u32, lines[idx], TEXT_WHITE, (wx + 572) as u32);
         y += 18;
         idx += 1;
     }

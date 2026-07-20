@@ -37,8 +37,7 @@ impl ShellBuf {
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
     match cmd {
-        b"help" =>
-            "help clear version sovereignty node-id awp-status mem window close reboot",
+        b"help" => "help clear version db window close reboot",
         b"clear" => "axos> ",
         b"version" => "aiXos Phoenix v0.1.0 — Sovereign Stack",
         b"sovereignty" =>
