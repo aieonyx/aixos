@@ -99,9 +99,9 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 #[derive(Clone, Copy)]
 struct WinSlot { open: bool, kind: u8, x: i32, y: i32 }
 static mut WINS: [WinSlot; 3] = [
-    WinSlot { open: false, kind: 0, x: 340, y: 110 },
-    WinSlot { open: false, kind: 0, x: 370, y: 140 },
-    WinSlot { open: false, kind: 0, x: 400, y: 170 },
+    WinSlot { open: false, kind: 0, x: 200, y: 80 },
+    WinSlot { open: false, kind: 0, x: 230, y: 110 },
+    WinSlot { open: false, kind: 0, x: 260, y: 140 },
 ];
 static mut ACTIVE_WIN: usize = 0;
 static mut DRAG_WIN: usize = 0;
@@ -141,18 +141,16 @@ pub extern "C" fn aixos_main() -> ! {
         Some(_) => {
             uart_write("GPU: ok\n");
             aixos_gpu::desktop::render_desktop();
-            // Render panel content immediately after desktop
-            aixos_gpu::desktop::render_left_panel(proof, aixos_identity::node_id());
-            aixos_gpu::desktop::render_right_panel();
-            // Status bar reflects actual proof state
-            if proof == 0x4153 {
-                aixos_gpu::desktop::render_status_bar(
-                    "aiXos Phoenix  |  axon_main() -> 0x4153  |  Sovereign");
-            } else {
-                aixos_gpu::desktop::render_status_bar(
-                    "aiXos Phoenix  |  boot incomplete  |  check PDs");
+            aixos_gpu::desktop::render_top_bar_icons();
+            {
+                let slots = unsafe {[
+                    (wins()[0].open, wins()[0].kind),
+                    (wins()[1].open, wins()[1].kind),
+                    (wins()[2].open, wins()[2].kind),
+                ]};
+                aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
             }
-            aixos_gpu::desktop::render_dock();
+            aixos_gpu::desktop::render_status_bar("aiXos Phoenix : axon_main() -> 0x4153 : Sovereign");
             uart_write("Desktop rendered\n");
         }
         None => { uart_write("GPU: none\n"); }
@@ -162,10 +160,8 @@ pub extern "C" fn aixos_main() -> ! {
     virtio_ok = kbd.is_some();
     if virtio_ok {
         uart_write("Input: virtio+uart\n");
-        aixos_gpu::desktop::render_right_panel_input(true);
     } else {
         uart_write("Input: uart only\n");
-        aixos_gpu::desktop::render_right_panel_input(false);
     }
 
     let mut mouse = aixos_input::mouse::init();
@@ -241,6 +237,12 @@ fn render_all_windows() {
         i += 1;
     }
     render_window_for_slot(active);
+    let slots = unsafe {[
+        (wins()[0].open, wins()[0].kind),
+        (wins()[1].open, wins()[1].kind),
+        (wins()[2].open, wins()[2].kind),
+    ]};
+    aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
 
 
@@ -374,7 +376,7 @@ fn handle_click(x: i32, y: i32) {
                 return;
             }
         }
-        if y > 40 && y < 670 && x > 200 && x < 1080 {
+        if y > 50 && y < 670 && x > 0 && x < 1280 {
             WINDOW_FOCUSED = false;
             if let Some(i) = find_kind(0) {
                 ACTIVE_WIN = i;
@@ -403,12 +405,12 @@ fn shell_loop(
             if m.poll(&mut mouse_state) {
                 aixos_gpu::erase_cursor(old_x, old_y);
                 unsafe {
-                    const DRAG_MIN_X: i32 = 200; const DRAG_MAX_X: i32 = 500;
+                    const DRAG_MIN_X: i32 = 0; const DRAG_MAX_X: i32 = 700;
                     if DRAG_ACTIVE && mouse_state.left {
                         let dw = DRAG_WIN;
                         let w = wins()[dw];
                         let nx = (mouse_state.x - DRAG_OFF_X).clamp(DRAG_MIN_X, DRAG_MAX_X);
-                        let ny = (mouse_state.y - DRAG_OFF_Y).clamp(40, 368);
+                        let ny = (mouse_state.y - DRAG_OFF_Y).clamp(50, 368);
                         if nx != w.x || ny != w.y {
                             aixos_gpu::desktop::set_window_pos(w.x, w.y);
                             aixos_gpu::desktop::clear_window();
@@ -421,7 +423,7 @@ fn shell_loop(
                 }
                 aixos_gpu::draw_cursor(mouse_state.x, mouse_state.y);
                 if mouse_state.left && !prev_left {
-                    if mouse_state.y > 670 {
+                    if mouse_state.y < 50 {
                         handle_dock_click(mouse_state.x, mouse_state.y);
                     } else {
                         handle_click(mouse_state.x, mouse_state.y);

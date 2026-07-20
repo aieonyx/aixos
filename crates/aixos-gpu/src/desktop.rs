@@ -14,24 +14,25 @@ const DOCK_BG:          u32 = 0x0D0D20;
 const SOVEREIGN_PURPLE: u32 = 0x7B4FDB;
 const ACCENT_TEAL:      u32 = 0x1BAF7A;
 const ACCENT_AMBER:     u32 = 0xD4A017;
+const TOP_BAR_H: u32 = 50;
+const TASKBAR_Y: u32 = 670;
+const TASKBAR_H: u32 = 50;
+const CANVAS_Y: u32 = 50;
+const CANVAS_H: u32 = 620;
 
 pub fn render_desktop() {
-    draw_rect(0, 0, 1280, 720, DARK_BG);
-    draw_rect(0, 0, 1280, 40, TOP_BAR);
-    draw_hline(0, 40, 1280, PANEL_BORDER);
-    draw_rect(0, 41, 200, 629, PANEL_BG);
-    draw_border(0, 41, 200, 629, PANEL_BORDER);
-    draw_rect(1080, 41, 200, 629, PANEL_BG);
-    draw_border(1080, 41, 200, 629, PANEL_BORDER);
-    draw_rect(201, 41, 878, 629, DARK_BG);
-    blend_rect(201, 41, 878, 629, SOVEREIGN_PURPLE, 28);
-    draw_rect(340, 670, 600, 48, DOCK_BG);
-    draw_border(340, 670, 600, 48, PANEL_BORDER);
-    draw_rect(624, 679, 32, 32, SOVEREIGN_PURPLE);
-    draw_border(624, 679, 32, 32, PANEL_BORDER);
-    // AIEONYX logo diamond
+    // Full canvas
+    draw_rect(0, CANVAS_Y, 1280, CANVAS_H, DARK_BG);
+    blend_rect(0, CANVAS_Y, 1280, CANVAS_H, SOVEREIGN_PURPLE, 28);
+    // Top bar
+    draw_rect(0, 0, 1280, TOP_BAR_H, TOP_BAR);
+    draw_hline(0, TOP_BAR_H, 1280, PANEL_BORDER);
+    // Taskbar
+    draw_rect(0, TASKBAR_Y, 1280, TASKBAR_H, DOCK_BG);
+    draw_hline(0, TASKBAR_Y, 1280, PANEL_BORDER);
+    // AIEONYX diamond centered at (640, 360)
     let cx: u32 = 640;
-    let cy: u32 = 355;
+    let cy: u32 = 360;
     let mut i: u32 = 0;
     while i <= 20 {
         let w = i * 2 + 1;
@@ -48,129 +49,55 @@ pub fn render_desktop() {
         draw_hline(x, y, w, SOVEREIGN_PURPLE);
         i += 1;
     }
-    draw_rect(1060, 14, 8, 8, ACCENT_TEAL);
+    // Teal indicator dot top-right
+    draw_rect(1260, 18, 8, 8, ACCENT_TEAL);
 }
 
 pub fn render_status_bar(text: &str) {
-    draw_str_2x(16, 12, text, TEXT_WHITE);
+    draw_str_2x(220, 16, text, TEXT_WHITE);
 }
 
-pub fn render_dock() {
+pub fn render_top_bar_icons() {
     // Node icon
-    draw_rect(360, 674, 80, 36, ACCENT_TEAL);
-    draw_str_2x(368, 683, "Node", TEXT_WHITE);
+    draw_rect(8, 8, 60, 34, ACCENT_TEAL);
+    draw_str(16, 18, "Node", TEXT_WHITE);
     // Shell icon
-    draw_rect(460, 674, 80, 36, ACCENT_AMBER);
-    draw_str_2x(461, 683, "Shell", TEXT_WHITE);
+    draw_rect(76, 8, 60, 34, ACCENT_AMBER);
+    draw_str(82, 18, "Shell", TEXT_WHITE);
     // EDB icon
-    draw_rect(560, 674, 80, 36, SOVEREIGN_PURPLE);
-    draw_str_2x(568, 683, "EDB", TEXT_WHITE);
-    // prompt label
+    draw_rect(144, 8, 60, 34, SOVEREIGN_PURPLE);
+    draw_str(155, 18, "EDB", TEXT_WHITE);
+}
+
+pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
+    draw_rect(0, TASKBAR_Y, 1280, TASKBAR_H, DOCK_BG);
+    draw_hline(0, TASKBAR_Y, 1280, PANEL_BORDER);
+    let names = ["Node", "Shell", "EDB"];
+    let mut btn_x: u32 = 8;
+    let mut i = 0;
+    while i < 3 {
+        if slots[i].0 {
+            let kind = slots[i].1 as usize;
+            let name = if kind < 3 { names[kind] } else { "Win" };
+            let color = if i == active { ACCENT_TEAL } else { PANEL_BG };
+            draw_rect(btn_x, TASKBAR_Y + 8, 110, 34, color);
+            draw_border(btn_x, TASKBAR_Y + 8, 110, 34, PANEL_BORDER);
+            draw_str(btn_x + 8, TASKBAR_Y + 20, name, TEXT_WHITE);
+            btn_x += 118;
+        }
+        i += 1;
+    }
+    // axos> prompt at right
+    draw_str(1100, TASKBAR_Y + 20, "axos>", TEXT_DIM);
 }
 
 /// Left panel — Sovereign Identity Space
 /// Shows node identity, ARPi ceremony state, boot proof.
-pub fn render_left_panel(proof: u32, node_id: u64) {
-    // Clear panel content area (leave border)
-    draw_rect(1, 42, 198, 627, PANEL_BG);
 
-    // Section header
-    draw_str(8, 52, "IDENTITY", SOVEREIGN_PURPLE);
-    draw_hline(1, 64, 198, PANEL_BORDER);
-
-    // Node ID — hardware-derived from RAM base + fw_cfg constants
-    draw_str(8, 72, "Node", TEXT_DIM);
-    // Render node_id as two lines of 8 hex digits each
-    let hi = (node_id >> 32) as u32;
-    let lo = node_id as u32;
-    crate::font::draw_hex32(8, 84, hi, TEXT_WHITE);
-    crate::font::draw_hex32(76, 84, lo, TEXT_WHITE);
-
-    draw_hline(1, 100, 198, PANEL_BORDER);
-
-    // ARPi ceremony state
-    draw_str(8, 108, "ARPi", TEXT_DIM);
-    if proof == 0x4153 {
-        draw_str(8, 120, "active", ACCENT_TEAL);
-    } else {
-        draw_str(8, 120, "pending", ACCENT_AMBER);
-    }
-
-    draw_hline(1, 136, 198, PANEL_BORDER);
-
-    // Sovereign proof
-    draw_str(8, 144, "Proof", TEXT_DIM);
-    if proof == 0x4153 {
-        draw_str(8, 156, "0x4153 [OK]", ACCENT_TEAL);
-    } else {
-        draw_str(8, 156, "incomplete", ACCENT_AMBER);
-    }
-
-    draw_hline(1, 172, 198, PANEL_BORDER);
-
-    // Boot mode
-    draw_str(8, 180, "Boot", TEXT_DIM);
-    draw_str(8, 192, "Live", TEXT_WHITE);
-
-    draw_hline(1, 208, 198, PANEL_BORDER);
-
-    // Architecture
-    draw_str(8, 216, "Arch", TEXT_DIM);
-    draw_str(8, 228, "aarch64", TEXT_WHITE);
-
-    draw_hline(1, 244, 198, PANEL_BORDER);
-
-    // Kernel
-    draw_str(8, 252, "Kernel", TEXT_DIM);
-    draw_str(8, 264, "Phoenix v0.1", TEXT_WHITE);
-}
 
 /// Right panel — System Space
 /// Shows AWP status, EdisonDB state, input driver, display.
-pub fn render_right_panel() {
-    draw_rect(1081, 42, 198, 627, PANEL_BG);
 
-    draw_str(1088, 52, "SYSTEM", SOVEREIGN_PURPLE);
-    draw_hline(1080, 64, 200, PANEL_BORDER);
-
-    // AWP status — loopback confirmed
-    draw_str(1088, 72, "AWP", TEXT_DIM);
-    draw_str(1088, 84, "lite-live", ACCENT_TEAL);
-
-    draw_hline(1080, 100, 200, PANEL_BORDER);
-
-    // EdisonDB
-    draw_str(1088, 108, "EdisonDB", TEXT_DIM);
-    if aixos_edisondb::is_live() {
-        draw_str(1088, 120, "live", ACCENT_TEAL);
-    } else {
-        draw_str(1088, 120, "stub", ACCENT_AMBER);
-    }
-
-    draw_hline(1080, 136, 200, PANEL_BORDER);
-
-    // Input driver
-    draw_str(1088, 144, "Input", TEXT_DIM);
-    draw_str(1088, 156, "virtio+uart", ACCENT_TEAL);
-
-    draw_hline(1080, 172, 200, PANEL_BORDER);
-
-    // Display
-    draw_str(1088, 180, "Display", TEXT_DIM);
-    draw_str(1088, 192, "ramfb 1280x720", ACCENT_TEAL);
-
-    draw_hline(1080, 208, 200, PANEL_BORDER);
-
-    // HANIEL
-    draw_str(1088, 216, "HANIEL", TEXT_DIM);
-    draw_str(1088, 228, "stub", ACCENT_AMBER);
-
-    draw_hline(1080, 244, 200, PANEL_BORDER);
-
-    // BASTION — shell loop running proves daemon context active
-    draw_str(1088, 252, "BASTION", TEXT_DIM);
-    draw_str(1088, 264, "lite-live", ACCENT_TEAL);
-}
 
 /// Update right panel input driver status after virtio init
 pub fn render_right_panel_input(virtio_ok: bool) {
@@ -206,8 +133,8 @@ const WIN_TITLE_H: u32 = 24;
 const WIN_BG:    u32 = 0x0D0D22;
 const WIN_TITLE: u32 = 0x1A1A3A;
 
-static mut CUR_WIN_X: i32 = 340;
-static mut CUR_WIN_Y: i32 = 110;
+static mut CUR_WIN_X: i32 = 200;
+static mut CUR_WIN_Y: i32 = 80;
 
 pub fn set_window_pos(x: i32, y: i32) {
     unsafe { CUR_WIN_X = x; CUR_WIN_Y = y; }
@@ -217,12 +144,10 @@ pub fn get_window_pos() -> (i32, i32) {
 }
 
 pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
-    if y < 674 || y >= 710 {
-        return None;
-    }
-    if x >= 360 && x < 440 { return Some(0); }
-    if x >= 460 && x < 540 { return Some(1); }
-    if x >= 560 && x < 640 { return Some(2); }
+    if y < 8 || y > 42 { return None; }
+    if x >= 8 && x < 68 { return Some(0); }
+    if x >= 76 && x < 136 { return Some(1); }
+    if x >= 144 && x < 204 { return Some(2); }
     None
 }
 
