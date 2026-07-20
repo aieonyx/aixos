@@ -58,22 +58,54 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
             }
         }
         b"window" => {
-            unsafe { WINDOW_OPEN = true; WINDOW_KIND = 0; }
-            render_current_window();
-            "window opened"
+            unsafe {
+                if let Some(i) = find_kind(0) {
+                    ACTIVE_WIN = i;
+                } else {
+                    let slot = find_free().unwrap_or(0);
+                    wins()[slot].open = true;
+                    wins()[slot].kind = 0;
+                    ACTIVE_WIN = slot;
+                }
+                render_all_windows();
+                "window opened"
+            }
         }
         b"close" => {
-            unsafe { if WINDOW_OPEN { WINDOW_OPEN = false;
-                aixos_gpu::desktop::clear_window(); "window closed"
-                } else { "no window open" } }
+            unsafe {
+                if wins()[ACTIVE_WIN].open {
+                    let w = wins()[ACTIVE_WIN];
+                    aixos_gpu::desktop::set_window_pos(w.x, w.y);
+                    aixos_gpu::desktop::clear_window();
+                    wins()[ACTIVE_WIN].open = false;
+                    WINDOW_FOCUSED = false;
+                    let mut i = 3;
+                    while i > 0 {
+                        i -= 1;
+                        if wins()[i].open { ACTIVE_WIN = i; break; }
+                    }
+                    render_all_windows();
+                    "window closed"
+                } else {
+                    "no window open"
+                }
+            }
         }
         b"" => "",
         _ => "axos: command not found",
     }
 }
 
-static mut WINDOW_OPEN: bool = false;
-static mut WINDOW_KIND: u8 = 0;
+
+#[derive(Clone, Copy)]
+struct WinSlot { open: bool, kind: u8, x: i32, y: i32 }
+static mut WINS: [WinSlot; 3] = [
+    WinSlot { open: false, kind: 0, x: 340, y: 110 },
+    WinSlot { open: false, kind: 0, x: 370, y: 140 },
+    WinSlot { open: false, kind: 0, x: 400, y: 170 },
+];
+static mut ACTIVE_WIN: usize = 0;
+static mut DRAG_WIN: usize = 0;
 static mut WIN_BUF: ShellBuf = ShellBuf::new();
 static mut WINDOW_FOCUSED: bool = false;
 static mut WIN_OUTPUT: [&str; 8] = [""; 8];
@@ -149,19 +181,43 @@ pub extern "C" fn aixos_main() -> ! {
     shell_loop(mouse, mouse_state);
 }
 
-fn render_current_window() {
-    let kind = unsafe { WINDOW_KIND };
-    match kind {
+fn wins() -> &'static mut [WinSlot; 3] {
+    unsafe { &mut *core::ptr::addr_of_mut!(WINS) }
+}
+
+fn any_open() -> bool {
+    wins().iter().any(|w| w.open)
+}
+
+fn find_kind(kind: u8) -> Option<usize> {
+    wins().iter().position(|w| w.open && w.kind == kind)
+}
+
+fn find_free() -> Option<usize> {
+    wins().iter().position(|w| !w.open)
+}
+
+fn active_kind() -> u8 {
+    unsafe { wins()[ACTIVE_WIN].kind }
+}
+
+fn render_window_for_slot(i: usize) {
+    let w = wins()[i];
+    if !w.open {
+        return;
+    }
+    aixos_gpu::desktop::set_window_pos(w.x, w.y);
+    match w.kind {
         1 => {
             aixos_gpu::desktop::render_window(
                 "Shell - aiXos Phoenix",
                 &["axos> sovereign shell", "type commands below", "",
                   "PL-24: shell window stub"]);
             unsafe {
-                let (wx, wy) = aixos_gpu::desktop::get_window_pos();
-                aixos_gpu::desktop::render_window_output(wx, wy, win_output(), WIN_OUTPUT_LEN);
+                let focused = WINDOW_FOCUSED && ACTIVE_WIN == i;
+                aixos_gpu::desktop::render_window_output(w.x, w.y, win_output(), WIN_OUTPUT_LEN);
                 let b = win_buf();
-                aixos_gpu::desktop::render_window_input(wx, wy, b.as_slice(), b.len, WINDOW_FOCUSED);
+                aixos_gpu::desktop::render_window_input(w.x, w.y, b.as_slice(), b.len, focused);
             }
         }
         2 => aixos_gpu::desktop::render_window(
@@ -176,17 +232,33 @@ fn render_current_window() {
     }
 }
 
+fn render_all_windows() {
+    let active = unsafe { ACTIVE_WIN };
+    let mut i = 0;
+    while i < 3 {
+        if i != active {
+            render_window_for_slot(i);
+        }
+        i += 1;
+    }
+    render_window_for_slot(active);
+}
+
+
 fn handle_dock_click(x: i32, y: i32) {
     if let Some(icon) = aixos_gpu::desktop::dock_icon_at(x, y) {
         unsafe {
-            if WINDOW_OPEN {
-                aixos_gpu::desktop::clear_window();
-            }
             WINDOW_FOCUSED = false;
-            WINDOW_KIND = icon;
-            WINDOW_OPEN = true;
+            if let Some(i) = find_kind(icon) {
+                ACTIVE_WIN = i;
+            } else {
+                let slot = find_free().unwrap_or(0);
+                wins()[slot].open = true;
+                wins()[slot].kind = icon;
+                ACTIVE_WIN = slot;
+            }
         }
-        render_current_window();
+        render_all_windows();
     }
 }
 
@@ -226,7 +298,11 @@ fn push_echo() -> &'static str {
 }
 
 fn handle_window_key(code: u16, ch: Option<char>) {
-    let (wx, wy) = aixos_gpu::desktop::get_window_pos();
+    let (wx, wy) = {
+        let w = wins()[unsafe { ACTIVE_WIN }];
+        aixos_gpu::desktop::set_window_pos(w.x, w.y);
+        (w.x, w.y)
+    };
     match code {
         1 => unsafe {
             WINDOW_FOCUSED = false;
@@ -239,7 +315,7 @@ fn handle_window_key(code: u16, ch: Option<char>) {
             let result = execute_cmd(win_buf());
             push_output(result);
             win_buf().clear();
-            if WINDOW_OPEN && WINDOW_KIND == 1 {
+            if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
                 aixos_gpu::desktop::render_window_output(wx, wy, win_output(), WIN_OUTPUT_LEN);
                 aixos_gpu::desktop::render_window_input(wx, wy, &[], 0, WINDOW_FOCUSED);
             }
@@ -263,26 +339,53 @@ fn handle_window_key(code: u16, ch: Option<char>) {
 
 fn handle_click(x: i32, y: i32) {
     unsafe {
-        let (wx, wy) = aixos_gpu::desktop::get_window_pos();
-        if WINDOW_OPEN && x >= wx && x < wx + 580 && y >= wy && y < wy + 24 {
-            DRAG_ACTIVE = true;
-            DRAG_OFF_X = x - wx;
-            DRAG_OFF_Y = y - wy;
-            return;
-        }
-        if WINDOW_OPEN && WINDOW_KIND == 1
-            && x >= wx && x < wx + 580 && y >= wy + 24 && y < wy + 300 {
-            WINDOW_FOCUSED = true;
-            let b = win_buf();
-            aixos_gpu::desktop::render_window_input(wx, wy, b.as_slice(), b.len, true);
-            return;
+        let order = [ACTIVE_WIN, 2, 1, 0];
+        let mut k = 0;
+        while k < 4 {
+            let i = order[k];
+            k += 1;
+            if k > 1 && i == order[0] { continue; }
+            let w = wins()[i];
+            if !w.open { continue; }
+            if x >= w.x && x < w.x + 580 && y >= w.y && y < w.y + 24 {
+                ACTIVE_WIN = i;
+                if x >= w.x + 518 && x < w.x + 580 {
+                    wins()[i].open = false;
+                    WINDOW_FOCUSED = false;
+                    aixos_gpu::desktop::set_window_pos(w.x, w.y);
+                    aixos_gpu::desktop::clear_window();
+                    let mut j = 3;
+                    while j > 0 { j -= 1; if wins()[j].open { ACTIVE_WIN = j; break; } }
+                    render_all_windows();
+                    return;
+                }
+                DRAG_WIN = i;
+                DRAG_ACTIVE = true;
+                DRAG_OFF_X = x - w.x;
+                DRAG_OFF_Y = y - w.y;
+                render_all_windows();
+                return;
+            }
+            if x >= w.x && x < w.x + 580 && y >= w.y + 24 && y < w.y + 300 {
+                ACTIVE_WIN = i;
+                if w.kind == 1 {
+                    WINDOW_FOCUSED = true;
+                }
+                render_all_windows();
+                return;
+            }
         }
         if y > 40 && y < 670 && x > 200 && x < 1080 {
-            if !WINDOW_OPEN {
-                WINDOW_OPEN = true;
-                WINDOW_KIND = 0;
-                render_current_window();
+            WINDOW_FOCUSED = false;
+            if let Some(i) = find_kind(0) {
+                ACTIVE_WIN = i;
+            } else {
+                let slot = find_free().unwrap_or(0);
+                wins()[slot].open = true;
+                wins()[slot].kind = 0;
+                ACTIVE_WIN = slot;
             }
+            render_all_windows();
         }
     }
 }
@@ -303,13 +406,16 @@ fn shell_loop(
                 unsafe {
                     const DRAG_MIN_X: i32 = 200; const DRAG_MAX_X: i32 = 500;
                     if DRAG_ACTIVE && mouse_state.left {
-                        let (wx, wy) = aixos_gpu::desktop::get_window_pos();
+                        let dw = DRAG_WIN;
+                        let w = wins()[dw];
                         let nx = (mouse_state.x - DRAG_OFF_X).clamp(DRAG_MIN_X, DRAG_MAX_X);
                         let ny = (mouse_state.y - DRAG_OFF_Y).clamp(40, 368);
-                        if nx != wx || ny != wy {
+                        if nx != w.x || ny != w.y {
+                            aixos_gpu::desktop::set_window_pos(w.x, w.y);
                             aixos_gpu::desktop::clear_window();
-                            aixos_gpu::desktop::set_window_pos(nx, ny);
-                            render_current_window();
+                            wins()[dw].x = nx;
+                            wins()[dw].y = ny;
+                            render_all_windows();
                         }
                     }
                     if !mouse_state.left { DRAG_ACTIVE = false; }
@@ -332,7 +438,7 @@ fn shell_loop(
 
 fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
     unsafe {
-        if WINDOW_FOCUSED && WINDOW_OPEN && WINDOW_KIND == 1 {
+        if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
             handle_window_key(code, ch);
             return;
         }
