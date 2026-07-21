@@ -95,21 +95,76 @@ pub fn render_status_bar(text: &str) {
 }
 
 pub fn render_top_bar_icons() {
-    // Node icon
+    // ── Node — hexagon centered in 60x34 ─────────────────────────────────────
     draw_rect(8, 8, 60, 34, ACCENT_TEAL);
-    draw_str(16, 18, "Node", TEXT_WHITE);
-    // Shell icon
+    blend_rect(8, 8, 60, 34, 0xFFFFFF, 10);
+    draw_hline(9, 8, 58, 0x1DA080);
+    let (hx, hy): (u32, u32) = (30, 16);
+    draw_hline(hx + 4, hy,      8, TEXT_WHITE);
+    draw_hline(hx + 2, hy + 2, 12, TEXT_WHITE);
+    draw_hline(hx,     hy + 4, 16, TEXT_WHITE);
+    draw_hline(hx,     hy + 6,  2, TEXT_WHITE);
+    draw_hline(hx + 14,hy + 6,  2, TEXT_WHITE);
+    draw_hline(hx + 2, hy + 6, 12, TEXT_WHITE);
+    draw_hline(hx + 2, hy + 8, 12, TEXT_WHITE);
+    draw_hline(hx + 4, hy + 10, 8, TEXT_WHITE);
+    draw_rect(hx + 2, hy + 2, 12, 8, ACCENT_TEAL);
+    draw_rect(hx + 6, hy + 4,  4, 4, TEXT_WHITE);
+
+    // ── Shell — >_ prompt centered in 60x34 ──────────────────────────────────
     draw_rect(76, 8, 60, 34, ACCENT_AMBER);
-    draw_str(82, 18, "Shell", TEXT_WHITE);
-    // EDB icon
+    blend_rect(76, 8, 60, 34, 0xFFFFFF, 8);
+    draw_hline(77, 8, 58, 0xB8860B);
+    let (sx, sy): (u32, u32) = (90, 14);
+    draw_hline(sx,     sy,      3, TEXT_WHITE);
+    draw_hline(sx + 3, sy + 3,  3, TEXT_WHITE);
+    draw_hline(sx + 6, sy + 6,  3, TEXT_WHITE);
+    draw_hline(sx + 3, sy + 9,  3, TEXT_WHITE);
+    draw_hline(sx,     sy + 12, 3, TEXT_WHITE);
+    draw_hline(sx + 6, sy + 15, 10, TEXT_WHITE);
+
+    // ── EDB — stacked discs centered in 60x34 ────────────────────────────────
     draw_rect(144, 8, 60, 34, SOVEREIGN_PURPLE);
-    draw_str(155, 18, "EDB", TEXT_WHITE);
-    // Settings icon
+    blend_rect(144, 8, 60, 34, 0xFFFFFF, 8);
+    draw_hline(145, 8, 58, 0x5A2FA0);
+    let (dx, dy): (u32, u32) = (156, 12);
+    draw_rect(dx, dy,      28, 4, TEXT_WHITE);
+    draw_rect(dx, dy + 6,  28, 4, TEXT_WHITE);
+    draw_rect(dx, dy + 12, 28, 4, TEXT_WHITE);
+    draw_rect(dx + 2, dy,  2, 2, SOVEREIGN_PURPLE);
+    draw_rect(dx + 24,dy,  2, 2, SOVEREIGN_PURPLE);
+
+    // ── Set — gear centered in 60x34 ─────────────────────────────────────────
     draw_rect(212, 8, 60, 34, SETTINGS_BLUE);
-    draw_str(222, 18, "Set", TEXT_WHITE);
-    // EDB Browser icon
+    blend_rect(212, 8, 60, 34, 0xFFFFFF, 8);
+    draw_hline(213, 8, 58, 0x2A4A80);
+    let (gx, gy): (u32, u32) = (234, 15);
+    draw_hline(gx + 4, gy,       8, TEXT_WHITE);
+    draw_hline(gx + 2, gy + 2,  12, TEXT_WHITE);
+    draw_hline(gx,     gy + 4,  16, TEXT_WHITE);
+    draw_hline(gx,     gy + 6,  16, TEXT_WHITE);
+    draw_hline(gx,     gy + 8,  16, TEXT_WHITE);
+    draw_hline(gx,     gy + 10, 16, TEXT_WHITE);
+    draw_hline(gx + 2, gy + 12, 12, TEXT_WHITE);
+    draw_hline(gx + 4, gy + 14,  8, TEXT_WHITE);
+    draw_rect(gx + 4, gy + 4,   8, 8, SETTINGS_BLUE);
+    draw_rect(gx + 6, gy + 6,   4, 4, TEXT_WHITE);
+    draw_rect(gx + 6, gy,       4, 2, SETTINGS_BLUE);
+    draw_rect(gx + 6, gy + 14,  4, 2, SETTINGS_BLUE);
+    draw_rect(gx,     gy + 6,   2, 4, SETTINGS_BLUE);
+    draw_rect(gx + 14,gy + 6,   2, 4, SETTINGS_BLUE);
+
+    // ── Brw — 2x2 grid centered in 60x34 ─────────────────────────────────────
     draw_rect(280, 8, 60, 34, BROWSE_GREEN);
-    draw_str(290, 18, "Brw", TEXT_WHITE);
+    blend_rect(280, 8, 60, 34, 0xFFFFFF, 8);
+    draw_hline(281, 8, 58, 0x1A5A3A);
+    let (bx, by): (u32, u32) = (303, 15);
+    draw_rect(bx,     by,     7, 7, TEXT_WHITE);
+    draw_rect(bx + 9, by,     7, 7, TEXT_WHITE);
+    draw_rect(bx,     by + 9, 7, 7, TEXT_WHITE);
+    draw_rect(bx + 9, by + 9, 7, 7, TEXT_WHITE);
+    draw_rect(bx + 7, by,     2, 16, BROWSE_GREEN);
+    draw_rect(bx,     by + 7,16,  2, BROWSE_GREEN);
 }
 
 pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
