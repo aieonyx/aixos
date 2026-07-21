@@ -175,6 +175,11 @@ const WIN_H: u32 = 300;
 const WIN_TITLE_H: u32 = 24;
 const WIN_BG:    u32 = 0x0D0D22;
 const WIN_TITLE: u32 = 0x1A1A3A;
+const GLASS_HI:  u32 = 0x3A3A5A;
+const GLASS_MID: u32 = 0x1E1E38;
+const GLASS_LOW: u32 = 0x111128;
+const SHADOW:    u32 = 0x000008;
+const CLOSE_RED: u32 = 0xC0392B;
 
 static mut CUR_WIN_X: i32 = 200;
 static mut CUR_WIN_Y: i32 = 80;
@@ -199,9 +204,17 @@ pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
 pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
-    draw_rect(wx.saturating_sub(1), wy.saturating_sub(1), w + 2, h + 2, ACCENT_TEAL);
-    draw_rect(wx, wy, w, WIN_TITLE_H, WIN_TITLE);
-    let tx = wx + 8;
+    blend_rect(wx + 3, wy + 3, w + 2, h + 2, SHADOW, 120);
+    draw_border(wx.saturating_sub(1), wy.saturating_sub(1), w + 2, h + 2, ACCENT_TEAL);
+    draw_border(wx, wy, w, h, 0x2A1A4A);
+    let band = WIN_TITLE_H / 4;
+    draw_rect(wx, wy,            w, band,                   GLASS_HI);
+    draw_rect(wx, wy + band,     w, band,                   GLASS_MID);
+    draw_rect(wx, wy + band * 2, w, band,                   GLASS_LOW);
+    draw_rect(wx, wy + band * 3, w, WIN_TITLE_H - band * 3, WIN_TITLE);
+    draw_hline(wx + 2, wy, w - 4, 0x6060A0);
+    blend_rect(wx, wy, w, WIN_TITLE_H, 0xFFFFFF, 8);
+    let tx = wx + 10;
     let ty = wy + 12;
     draw_hline(tx,                   ty.saturating_sub(4), 1, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(1), ty.saturating_sub(3), 3, SOVEREIGN_PURPLE);
@@ -212,10 +225,16 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_hline(tx.saturating_sub(2), ty + 2,               5, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
-    draw_str(wx + 22, wy + 8, title, TEXT_WHITE);
-    draw_str(wx + w - 62, wy + 8, "[close]", 0x666688);
+    draw_str(wx + 24, wy + 8, title, TEXT_WHITE);
+    let cx = wx + w - 18;
+    let cy = wy + 7;
+    draw_rect(cx, cy, 10, 10, CLOSE_RED);
+    blend_rect(cx, cy, 10, 5, 0xFFFFFF, 40);
+    draw_border(cx, cy, 10, 10, 0x8B1A1A);
+    draw_str(cx + 2, cy + 1, "x", TEXT_WHITE);
     draw_hline(wx, wy + WIN_TITLE_H, w, ACCENT_TEAL);
     draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
+    blend_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, SOVEREIGN_PURPLE, 12);
     let mut row = 0u32;
     let max_rows = if h > WIN_TITLE_H + 20 { (h - WIN_TITLE_H - 20) / 18 } else { 0 };
     for line in lines.iter().take(max_rows as usize) {
@@ -223,6 +242,7 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
         row += 1;
     }
     draw_rect(wx + w - 12, wy + h - 12, 12, 12, ACCENT_TEAL);
+    blend_rect(wx + w - 12, wy + h - 12, 12, 6, 0xFFFFFF, 30);
     draw_rect(wx + w - 8, wy + h - 8, 4, 4, TEXT_WHITE);
 }
 
