@@ -37,7 +37,7 @@ impl ShellBuf {
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
     match cmd {
-        b"help" => "help clear version db window close reboot",
+        b"help" => "help clear version db window settings close reboot",
         b"clear" => "axos> ",
         b"version" => "aiXos Phoenix v0.1.0 — Sovereign Stack",
         b"sovereignty" =>
@@ -70,6 +70,20 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                 "window opened"
             }
         }
+        b"settings" => {
+            unsafe {
+                if let Some(i) = find_kind(3) {
+                    ACTIVE_WIN = i;
+                } else {
+                    let slot = find_free().unwrap_or(0);
+                    wins()[slot].open = true;
+                    wins()[slot].kind = 3;
+                    ACTIVE_WIN = slot;
+                }
+                render_all_windows();
+                "settings opened"
+            }
+        }
         b"close" => {
             unsafe {
                 if wins()[ACTIVE_WIN].open {
@@ -78,7 +92,7 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                     aixos_gpu::desktop::clear_window();
                     wins()[ACTIVE_WIN].open = false;
                     WINDOW_FOCUSED = false;
-                    let mut i = 3;
+                    let mut i = 4;
                     while i > 0 {
                         i -= 1;
                         if wins()[i].open { ACTIVE_WIN = i; break; }
@@ -98,10 +112,11 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 
 #[derive(Clone, Copy)]
 struct WinSlot { open: bool, kind: u8, x: i32, y: i32, w: u32, h: u32 }
-static mut WINS: [WinSlot; 3] = [
-    WinSlot { open: false, kind: 0, x: 200, y: 80, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 230, y: 110, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 260, y: 140, w: 580, h: 300 },
+static mut WINS: [WinSlot; 4] = [
+    WinSlot { open: false, kind: 0, x: 60,  y: 80,  w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 100, y: 100, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 140, y: 120, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 180, y: 140, w: 580, h: 300 },
 ];
 static mut ACTIVE_WIN: usize = 0;
 static mut DRAG_WIN: usize = 0;
@@ -149,6 +164,7 @@ pub extern "C" fn aixos_main() -> ! {
                     (wins()[0].open, wins()[0].kind),
                     (wins()[1].open, wins()[1].kind),
                     (wins()[2].open, wins()[2].kind),
+                    (wins()[3].open, wins()[3].kind),
                 ]};
                 aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
             }
@@ -178,7 +194,7 @@ pub extern "C" fn aixos_main() -> ! {
     shell_loop(mouse, mouse_state);
 }
 
-fn wins() -> &'static mut [WinSlot; 3] {
+fn wins() -> &'static mut [WinSlot; 4] {
     unsafe { &mut *core::ptr::addr_of_mut!(WINS) }
 }
 
@@ -215,7 +231,7 @@ fn render_window_for_slot(i: usize) {
                 let focused = WINDOW_FOCUSED && ACTIVE_WIN == i;
                 aixos_gpu::desktop::render_window_output_hw(w.x, w.y, win_output(), WIN_OUTPUT_LEN, w.h, w.w);
                 let b = win_buf();
-                aixos_gpu::desktop::render_window_input_h(w.x, w.y, b.as_slice(), b.len, focused, w.h);
+                aixos_gpu::desktop::render_window_input_hw(w.x, w.y, b.as_slice(), b.len, focused, w.h, w.w);
             }
         }
         2 => aixos_gpu::desktop::render_window(
@@ -223,6 +239,15 @@ fn render_window_for_slot(i: usize) {
             &["Status: live", "Entries: (see db command)",
               "boot:proof = 0x4153", "boot:node_id = stored",
               "Tier: Critical / Personal / Noise"],
+            w.w, w.h),
+        3 => aixos_gpu::desktop::render_window(
+            "Settings - aiXos Phoenix",
+            &["Display:  ramfb 1280x720  FORMAT_XR24",
+              "System:   aiXos Phoenix v0.1.0  aarch64",
+              "Proof:    axon_main() -> 0x4153 [SOVEREIGN]",
+              "Store:    EdisonDB live  sovereign store",
+              "Input:    virtio+uart",
+              "About:    AIEONYX  Sovereign Digital Infrastructure"],
             w.w, w.h),
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
@@ -235,7 +260,7 @@ fn render_window_for_slot(i: usize) {
 fn render_windows_only() {
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
-    while i < 3 {
+    while i < 4 {
         if i != active { render_window_for_slot(i); }
         i += 1;
     }
@@ -244,6 +269,7 @@ fn render_windows_only() {
         (wins()[0].open, wins()[0].kind),
         (wins()[1].open, wins()[1].kind),
         (wins()[2].open, wins()[2].kind),
+        (wins()[3].open, wins()[3].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
@@ -254,7 +280,7 @@ fn render_all_windows() {
     aixos_gpu::desktop::render_status_bar("aiXos Phoenix : axon_main() -> 0x4153 : Sovereign");
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
-    while i < 3 {
+    while i < 4 {
         if i != active {
             render_window_for_slot(i);
         }
@@ -265,6 +291,7 @@ fn render_all_windows() {
         (wins()[0].open, wins()[0].kind),
         (wins()[1].open, wins()[1].kind),
         (wins()[2].open, wins()[2].kind),
+        (wins()[3].open, wins()[3].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
@@ -364,9 +391,9 @@ fn handle_window_key(code: u16, ch: Option<char>) {
 
 fn handle_click(x: i32, y: i32) {
     unsafe {
-        let order = [ACTIVE_WIN, 2, 1, 0];
+        let order = [ACTIVE_WIN, 3, 2, 1, 0];
         let mut k = 0;
-        while k < 4 {
+        while k < 5 {
             let i = order[k];
             k += 1;
             if k > 1 && i == order[0] { continue; }
@@ -387,7 +414,7 @@ fn handle_click(x: i32, y: i32) {
                     WINDOW_FOCUSED = false;
                     aixos_gpu::desktop::set_window_pos(w.x, w.y);
                     aixos_gpu::desktop::clear_window();
-                    let mut j = 3;
+                    let mut j = 4;
                     while j > 0 { j -= 1; if wins()[j].open { ACTIVE_WIN = j; break; } }
                     render_all_windows();
                     return;
@@ -453,7 +480,7 @@ fn shell_loop(
                         let dw = DRAG_WIN;
                         let w = wins()[dw];
                         let nx = (mouse_state.x - DRAG_OFF_X).clamp(DRAG_MIN_X, DRAG_MAX_X);
-                        let ny = (mouse_state.y - DRAG_OFF_Y).clamp(50, 368);
+                        let ny = (mouse_state.y - DRAG_OFF_Y).clamp(50, 580);
                         if nx != w.x || ny != w.y {
                             // Erase old position before moving
                             aixos_gpu::desktop::set_window_pos(w.x, w.y);

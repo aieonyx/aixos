@@ -15,6 +15,7 @@ const DOCK_BG:          u32 = 0x0D0D20;
 const SOVEREIGN_PURPLE: u32 = 0x7B4FDB;
 const ACCENT_TEAL:      u32 = 0x1BAF7A;
 const ACCENT_AMBER:     u32 = 0xD4A017;
+const SETTINGS_BLUE:    u32 = 0x1B7FC4;
 const TOP_BAR_H: u32 = 50;
 const TASKBAR_Y: u32 = 670;
 const TASKBAR_H: u32 = 50;
@@ -57,7 +58,7 @@ pub fn render_desktop() {
 }
 
 pub fn render_status_bar(text: &str) {
-    draw_str_2x(220, 16, text, TEXT_WHITE);
+    draw_str_2x(430, 16, text, TEXT_WHITE);
 }
 
 pub fn render_top_bar_icons() {
@@ -70,18 +71,21 @@ pub fn render_top_bar_icons() {
     // EDB icon
     draw_rect(144, 8, 60, 34, SOVEREIGN_PURPLE);
     draw_str(155, 18, "EDB", TEXT_WHITE);
+    // Settings icon
+    draw_rect(212, 8, 60, 34, SETTINGS_BLUE);
+    draw_str(222, 18, "Set", TEXT_WHITE);
 }
 
 pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
     draw_rect(0, TASKBAR_Y, 1280, TASKBAR_H, DOCK_BG);
     draw_hline(0, TASKBAR_Y, 1280, PANEL_BORDER);
-    let names = ["Node", "Shell", "EDB"];
+    let names = ["Node", "Shell", "EDB", "Set"];
     let mut btn_x: u32 = 8;
     let mut i = 0;
-    while i < 3 {
+    while i < 4 {
         if slots[i].0 {
             let kind = slots[i].1 as usize;
-            let name = if kind < 3 { names[kind] } else { "Win" };
+            let name = if kind < 4 { names[kind] } else { "Win" };
             let color = if i == active { ACCENT_TEAL } else { PANEL_BG };
             draw_rect(btn_x, TASKBAR_Y + 8, 110, 34, color);
             draw_border(btn_x, TASKBAR_Y + 8, 110, 34, PANEL_BORDER);
@@ -151,6 +155,7 @@ pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
     if x >= 8 && x < 68 { return Some(0); }
     if x >= 76 && x < 136 { return Some(1); }
     if x >= 144 && x < 204 { return Some(2); }
+    if x >= 212 && x < 272 { return Some(3); }
     None
 }
 
@@ -206,16 +211,21 @@ pub fn render_window_input(wx: i32, wy: i32, buf: &[u8], len: usize, focused: bo
     render_window_input_h(wx, wy, buf, len, focused, WIN_H);
 }
 pub fn render_window_input_h(wx: i32, wy: i32, buf: &[u8], len: usize, focused: bool, wh: u32) {
+    render_window_input_hw(wx, wy, buf, len, focused, wh, 580);
+}
+pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused: bool, wh: u32, ww: u32) {
     let y = wy + wh as i32 - 20;
     let y = if y < wy + 30 { wy + 30 } else { y };
-    draw_rect((wx + 4) as u32, (y - 2) as u32, (wh.min(580)) as u32, 18, WIN_BG);
+    draw_rect((wx + 4) as u32, (y - 2) as u32, ww.saturating_sub(8), 18, WIN_BG);
     draw_str((wx + 8) as u32, y as u32, "win> ", ACCENT_TEAL);
     if let Ok(txt) = core::str::from_utf8(&buf[..len]) {
         draw_str((wx + 48) as u32, y as u32, txt, TEXT_WHITE);
     }
     draw_str((wx + 48 + (len as i32) * 8) as u32, y as u32, "_", TEXT_WHITE);
     if focused {
-        draw_str((wx + 500) as u32, y as u32, "[focused]", TEXT_DIM);
+        // Draw [focused] inside window right edge
+        let fx = (wx as u32 + ww).saturating_sub(80);
+        draw_str(fx, y as u32, "[focused]", TEXT_DIM);
     }
 }
 
