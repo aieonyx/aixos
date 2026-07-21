@@ -180,8 +180,9 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_hline(wx, wy + WIN_TITLE_H, w, ACCENT_TEAL);
     draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
     let mut row = 0u32;
-    for line in lines.iter().take(10) {
-        draw_str(wx + 12, wy + WIN_TITLE_H + 12 + row * 18, line, TEXT_WHITE);
+    let max_rows = if h > WIN_TITLE_H + 20 { (h - WIN_TITLE_H - 20) / 18 } else { 0 };
+    for line in lines.iter().take(max_rows as usize) {
+        draw_str_clipped(wx + 12, wy + WIN_TITLE_H + 12 + row * 18, line, TEXT_WHITE, wx + w - 8);
         row += 1;
     }
     draw_rect(wx + w - 12, wy + h - 12, 12, 12, ACCENT_TEAL);
