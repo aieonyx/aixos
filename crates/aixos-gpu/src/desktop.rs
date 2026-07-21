@@ -3,7 +3,7 @@
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect};
 use crate::framebuffer::cache_flush;
-use crate::font::{draw_str, draw_str_2x, draw_str_clipped};
+use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32};
 
 const DARK_BG:          u32 = 0x0A0A1A;
 const PANEL_BG:         u32 = 0x141428;
@@ -16,6 +16,7 @@ const SOVEREIGN_PURPLE: u32 = 0x7B4FDB;
 const ACCENT_TEAL:      u32 = 0x1BAF7A;
 const ACCENT_AMBER:     u32 = 0xD4A017;
 const SETTINGS_BLUE:    u32 = 0x1B7FC4;
+const BROWSE_GREEN:     u32 = 0x2A7A4A;
 const TOP_BAR_H: u32 = 50;
 const TASKBAR_Y: u32 = 670;
 const TASKBAR_H: u32 = 50;
@@ -74,18 +75,21 @@ pub fn render_top_bar_icons() {
     // Settings icon
     draw_rect(212, 8, 60, 34, SETTINGS_BLUE);
     draw_str(222, 18, "Set", TEXT_WHITE);
+    // EDB Browser icon
+    draw_rect(280, 8, 60, 34, BROWSE_GREEN);
+    draw_str(290, 18, "Brw", TEXT_WHITE);
 }
 
 pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
     draw_rect(0, TASKBAR_Y, 1280, TASKBAR_H, DOCK_BG);
     draw_hline(0, TASKBAR_Y, 1280, PANEL_BORDER);
-    let names = ["Node", "Shell", "EDB", "Set"];
+    let names = ["Node", "Shell", "EDB", "Set", "Brw"];
     let mut btn_x: u32 = 8;
     let mut i = 0;
-    while i < 4 {
+    while i < 5 {
         if slots[i].0 {
             let kind = slots[i].1 as usize;
-            let name = if kind < 4 { names[kind] } else { "Win" };
+            let name = if kind < 5 { names[kind] } else { "Win" };
             let color = if i == active { ACCENT_TEAL } else { PANEL_BG };
             draw_rect(btn_x, TASKBAR_Y + 8, 110, 34, color);
             draw_border(btn_x, TASKBAR_Y + 8, 110, 34, PANEL_BORDER);
@@ -156,6 +160,7 @@ pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
     if x >= 76 && x < 136 { return Some(1); }
     if x >= 144 && x < 204 { return Some(2); }
     if x >= 212 && x < 272 { return Some(3); }
+    if x >= 280 && x < 340 { return Some(4); }
     None
 }
 
@@ -228,6 +233,71 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
         let fx = (wx as u32 + ww).saturating_sub(80);
         draw_str(fx, y as u32, "[focused]", TEXT_DIM);
     }
+}
+
+
+// ── PL-32: EDB Browser Window ────────────────────────────────────────────────
+
+pub struct EdbEntry {
+    pub key:   &'static str,
+    pub tier:  &'static str,
+    pub value: u64,
+}
+
+pub fn render_edb_browser(
+    wx: i32, wy: i32, w: u32, h: u32,
+    entries: &[EdbEntry],
+    cursor: usize, scroll: usize,
+    input_buf: &[u8], input_len: usize,
+    focused: bool,
+) {
+    let wx_u = wx as u32;
+    let count = entries.len();
+    let hdr_y = (wy + WIN_TITLE_H as i32 + 4) as u32;
+    draw_rect(wx_u + 1, hdr_y, w - 2, 16, WIN_BG);
+    draw_str(wx_u + 8, hdr_y + 2, "Entries:", TEXT_DIM);
+    draw_hex32(wx_u + 72, hdr_y + 2, count as u32, ACCENT_TEAL);
+    draw_str(wx_u + 120, hdr_y + 2, "/ 32", TEXT_DIM);
+    let sep_y = hdr_y + 17;
+    draw_hline(wx_u + 4, sep_y, w - 8, PANEL_BORDER);
+    let input_row_y = (wy + h as i32 - 22) as u32;
+    let body_top = sep_y + 3;
+    let row_h: u32 = 16;
+    let max_visible = if input_row_y > body_top {
+        ((input_row_y - body_top) / row_h) as usize
+    } else { 0 };
+    if input_row_y > body_top {
+        draw_rect(wx_u + 1, body_top, w - 2, input_row_y - body_top, WIN_BG);
+    }
+    let mut row = 0usize;
+    while row < max_visible {
+        let ei = scroll + row;
+        if ei >= count { break; }
+        let ry = body_top + row as u32 * row_h;
+        let is_cur = ei == cursor;
+        if is_cur {
+            draw_rect(wx_u + 2, ry, w - 4, row_h - 1, 0x0D2A20);
+            draw_str(wx_u + 4, ry + 4, ">", ACCENT_TEAL);
+        } else {
+            draw_str(wx_u + 4, ry + 4, " ", TEXT_DIM);
+        }
+        let tier_col = if is_cur { ACCENT_TEAL } else { TEXT_DIM };
+        draw_str(wx_u + 14, ry + 4, entries[ei].tier, tier_col);
+        draw_str_clipped(wx_u + 28, ry + 4, entries[ei].key, TEXT_WHITE, wx_u + w - 100);
+        draw_hex32(wx_u + w - 96, ry + 4, entries[ei].value as u32, ACCENT_AMBER);
+        row += 1;
+    }
+    draw_hline(wx_u + 4, input_row_y - 3, w - 8, PANEL_BORDER);
+    draw_rect(wx_u + 4, input_row_y - 1, w - 8, 18, WIN_BG);
+    draw_str(wx_u + 8, input_row_y + 2, "edb>", ACCENT_TEAL);
+    let buf_x = wx_u + 40;
+    if let Ok(txt) = core::str::from_utf8(&input_buf[..input_len]) {
+        draw_str(buf_x, input_row_y + 2, txt, TEXT_WHITE);
+    }
+    draw_str(buf_x + (input_len as u32) * 8, input_row_y + 2, "_", TEXT_WHITE);
+    if focused { draw_str(wx_u + w - 80, input_row_y + 2, "[focused]", TEXT_DIM); }
+    draw_rect(wx_u + w - 12, (wy + h as i32 - 12) as u32, 12, 12, ACCENT_TEAL);
+    draw_rect(wx_u + w - 8,  (wy + h as i32 - 8) as u32,  4,  4,  TEXT_WHITE);
 }
 
 pub fn clear_window_sized(w: u32, h: u32) {

@@ -79,6 +79,24 @@ pub fn log_event(event: &'static str) -> bool {
     write(event, count() as u64, Tier::Noise)
 }
 
+pub fn entry_count() -> usize {
+    unsafe { STORE_LEN }
+}
+
+pub fn entry_at(i: usize) -> Option<(&'static str, &'static str, u64)> {
+    unsafe {
+        if i >= STORE_LEN { return None; }
+        if let Some(ref e) = STORE[i] {
+            let t = match e.tier {
+                Tier::Critical => "C",
+                Tier::Personal => "P",
+                Tier::Noise    => "N",
+            };
+            Some((e.key, t, e.value))
+        } else { None }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

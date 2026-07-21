@@ -37,7 +37,7 @@ impl ShellBuf {
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
     match cmd {
-        b"help" => "help clear version db window settings close reboot",
+        b"help" => "help clear version db window settings browse close reboot",
         b"clear" => "axos> ",
         b"version" => "aiXos Phoenix v0.1.0 — Sovereign Stack",
         b"sovereignty" =>
@@ -84,6 +84,24 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                 "settings opened"
             }
         }
+        b"browse" => {
+            unsafe {
+                if let Some(i) = find_kind(4) {
+                    ACTIVE_WIN = i;
+                } else {
+                    let slot = find_free().unwrap_or(0);
+                    wins()[slot].open = true;
+                    wins()[slot].kind = 4;
+                    ACTIVE_WIN = slot;
+                }
+                EDB_CURSOR = 0;
+                EDB_SCROLL = 0;
+                EDB_FOCUSED = false;
+                EDB_INPUT.clear();
+                render_all_windows();
+                "EDB browser opened"
+            }
+        }
         b"close" => {
             unsafe {
                 if wins()[ACTIVE_WIN].open {
@@ -92,7 +110,7 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                     aixos_gpu::desktop::clear_window();
                     wins()[ACTIVE_WIN].open = false;
                     WINDOW_FOCUSED = false;
-                    let mut i = 4;
+                    let mut i = 5;
                     while i > 0 {
                         i -= 1;
                         if wins()[i].open { ACTIVE_WIN = i; break; }
@@ -112,11 +130,12 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 
 #[derive(Clone, Copy)]
 struct WinSlot { open: bool, kind: u8, x: i32, y: i32, w: u32, h: u32 }
-static mut WINS: [WinSlot; 4] = [
+static mut WINS: [WinSlot; 5] = [
     WinSlot { open: false, kind: 0, x: 60,  y: 80,  w: 580, h: 300 },
     WinSlot { open: false, kind: 0, x: 100, y: 100, w: 580, h: 300 },
     WinSlot { open: false, kind: 0, x: 140, y: 120, w: 580, h: 300 },
     WinSlot { open: false, kind: 0, x: 180, y: 140, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 220, y: 160, w: 580, h: 300 },
 ];
 static mut ACTIVE_WIN: usize = 0;
 static mut DRAG_WIN: usize = 0;
@@ -131,6 +150,12 @@ static mut DRAG_OFF_X: i32 = 0;
 static mut DRAG_OFF_Y: i32 = 0;
 static mut RESIZE_ACTIVE: bool = false;
 static mut RESIZE_WIN: usize = 0;
+static mut EDB_CURSOR: usize = 0;
+static mut EDB_SCROLL: usize = 0;
+static mut EDB_INPUT: ShellBuf = ShellBuf::new();
+static mut EDB_FOCUSED: bool = false;
+static mut EDB_ENTRY_COUNT: usize = 0;
+static mut EDB_ENTRIES: [(&'static str, &'static str, u64); 32] = [("", "", 0u64); 32];
 
 #[no_mangle]
 pub extern "C" fn aixos_main() -> ! {
@@ -165,6 +190,7 @@ pub extern "C" fn aixos_main() -> ! {
                     (wins()[1].open, wins()[1].kind),
                     (wins()[2].open, wins()[2].kind),
                     (wins()[3].open, wins()[3].kind),
+                    (wins()[4].open, wins()[4].kind),
                 ]};
                 aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
             }
@@ -194,7 +220,7 @@ pub extern "C" fn aixos_main() -> ! {
     shell_loop(mouse, mouse_state);
 }
 
-fn wins() -> &'static mut [WinSlot; 4] {
+fn wins() -> &'static mut [WinSlot; 5] {
     unsafe { &mut *core::ptr::addr_of_mut!(WINS) }
 }
 
@@ -249,6 +275,41 @@ fn render_window_for_slot(i: usize) {
               "Input:    virtio+uart",
               "About:    AIEONYX  Sovereign Digital Infrastructure"],
             w.w, w.h),
+        4 => {
+            unsafe {
+                EDB_ENTRY_COUNT = aixos_edisondb::entry_count();
+                let n = if EDB_ENTRY_COUNT > 32 { 32 } else { EDB_ENTRY_COUNT };
+                let mut ei = 0;
+                while ei < n {
+                    if let Some((k, t, v)) = aixos_edisondb::entry_at(ei) {
+                        EDB_ENTRIES[ei] = (k, t, v);
+                    }
+                    ei += 1;
+                }
+                let mut slots: [aixos_gpu::desktop::EdbEntry; 32] = core::array::from_fn(|_|
+                    aixos_gpu::desktop::EdbEntry { key: "", tier: "", value: 0 }
+                );
+                let mut si = 0;
+                while si < n {
+                    slots[si] = aixos_gpu::desktop::EdbEntry {
+                        key:   EDB_ENTRIES[si].0,
+                        tier:  EDB_ENTRIES[si].1,
+                        value: EDB_ENTRIES[si].2,
+                    };
+                    si += 1;
+                }
+                aixos_gpu::desktop::render_window("EdisonDB Browser", &[], w.w, w.h);
+                let focused = EDB_FOCUSED && ACTIVE_WIN == i;
+                let inp = &*core::ptr::addr_of!(EDB_INPUT);
+                aixos_gpu::desktop::render_edb_browser(
+                    w.x, w.y, w.w, w.h,
+                    &slots[..n],
+                    EDB_CURSOR, EDB_SCROLL,
+                    inp.as_slice(), inp.len,
+                    focused,
+                );
+            }
+        }
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
@@ -260,7 +321,7 @@ fn render_window_for_slot(i: usize) {
 fn render_windows_only() {
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
-    while i < 4 {
+    while i < 5 {
         if i != active { render_window_for_slot(i); }
         i += 1;
     }
@@ -270,6 +331,7 @@ fn render_windows_only() {
         (wins()[1].open, wins()[1].kind),
         (wins()[2].open, wins()[2].kind),
         (wins()[3].open, wins()[3].kind),
+        (wins()[4].open, wins()[4].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
@@ -280,7 +342,7 @@ fn render_all_windows() {
     aixos_gpu::desktop::render_status_bar("aiXos Phoenix : axon_main() -> 0x4153 : Sovereign");
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
-    while i < 4 {
+    while i < 5 {
         if i != active {
             render_window_for_slot(i);
         }
@@ -292,6 +354,7 @@ fn render_all_windows() {
         (wins()[1].open, wins()[1].kind),
         (wins()[2].open, wins()[2].kind),
         (wins()[3].open, wins()[3].kind),
+        (wins()[4].open, wins()[4].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
@@ -349,7 +412,73 @@ fn push_echo() -> &'static str {
     }
 }
 
+fn handle_edb_key(code: u16, ch: Option<char>) {
+    unsafe {
+        let count = EDB_ENTRY_COUNT;
+        match code {
+            103 => {
+                if EDB_CURSOR > 0 { EDB_CURSOR -= 1; }
+                if EDB_CURSOR < EDB_SCROLL { EDB_SCROLL = EDB_CURSOR; }
+                render_all_windows();
+            }
+            108 => {
+                if count > 0 && EDB_CURSOR + 1 < count { EDB_CURSOR += 1; }
+                if EDB_CURSOR >= EDB_SCROLL + 8 { EDB_SCROLL = EDB_CURSOR.saturating_sub(7); }
+                render_all_windows();
+            }
+            1 => { EDB_FOCUSED = false; render_all_windows(); }
+            28 => {
+                let inp = &*core::ptr::addr_of!(EDB_INPUT);
+                let bytes = inp.as_slice();
+                if bytes.starts_with(b"put ") {
+                    let rest = &bytes[4..];
+                    let mut sp = rest.len();
+                    let mut j = 0;
+                    while j < rest.len() {
+                        if rest[j] == b' ' { sp = j; break; }
+                        j += 1;
+                    }
+                    if sp < rest.len() {
+                        let val_bytes = &rest[sp + 1..];
+                        let mut val: u64 = 0;
+                        let mut vi = 0;
+                        while vi < val_bytes.len() {
+                            let b = val_bytes[vi];
+                            if b >= b'0' && b <= b'9' {
+                                val = val.wrapping_mul(10).wrapping_add((b - b'0') as u64);
+                            }
+                            vi += 1;
+                        }
+                        aixos_edisondb::write("edb:put", val, aixos_edisondb::Tier::Noise);
+                    }
+                }
+                EDB_INPUT.clear();
+                EDB_FOCUSED = false;
+                EDB_ENTRY_COUNT = aixos_edisondb::entry_count();
+                render_all_windows();
+            }
+            14 => { EDB_INPUT.pop(); render_all_windows(); }
+            _ => {
+                if let Some(c) = ch {
+                    let b = c as u8;
+                    if (0x20..0x7fu8).contains(&b) {
+                        EDB_INPUT.push(b);
+                        EDB_FOCUSED = true;
+                        render_all_windows();
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn handle_window_key(code: u16, ch: Option<char>) {
+    unsafe {
+        if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 4 {
+            handle_edb_key(code, ch);
+            return;
+        }
+    }
     let (wx, wy) = {
         let w = wins()[unsafe { ACTIVE_WIN }];
         aixos_gpu::desktop::set_window_pos(w.x, w.y);
@@ -391,9 +520,9 @@ fn handle_window_key(code: u16, ch: Option<char>) {
 
 fn handle_click(x: i32, y: i32) {
     unsafe {
-        let order = [ACTIVE_WIN, 3, 2, 1, 0];
+        let order = [ACTIVE_WIN, 4, 3, 2, 1, 0];
         let mut k = 0;
-        while k < 5 {
+        while k < 6 {
             let i = order[k];
             k += 1;
             if k > 1 && i == order[0] { continue; }
@@ -414,7 +543,7 @@ fn handle_click(x: i32, y: i32) {
                     WINDOW_FOCUSED = false;
                     aixos_gpu::desktop::set_window_pos(w.x, w.y);
                     aixos_gpu::desktop::clear_window();
-                    let mut j = 4;
+                    let mut j = 5;
                     while j > 0 { j -= 1; if wins()[j].open { ACTIVE_WIN = j; break; } }
                     render_all_windows();
                     return;
@@ -431,6 +560,7 @@ fn handle_click(x: i32, y: i32) {
                 if w.kind == 1 {
                     WINDOW_FOCUSED = true;
                 }
+                if w.kind == 4 { EDB_FOCUSED = true; }
                 render_all_windows();
                 return;
             }
@@ -511,6 +641,10 @@ fn shell_loop(
 fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
     unsafe {
         if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
+            handle_window_key(code, ch);
+            return;
+        }
+        if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 4 {
             handle_window_key(code, ch);
             return;
         }
