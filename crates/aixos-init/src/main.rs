@@ -545,7 +545,7 @@ fn handle_click(x: i32, y: i32) {
             }
             if x >= w.x && x < w.x + w.w as i32 && y >= w.y && y < w.y + 24 {
                 ACTIVE_WIN = i;
-                if x >= w.x + w.w as i32 - 62 && x < w.x + w.w as i32 {
+                if x >= w.x + w.w as i32 - 22 && x < w.x + w.w as i32 - 6 {
                     wins()[i].open = false;
                     WINDOW_FOCUSED = false;
                     aixos_gpu::desktop::set_window_pos(w.x, w.y);
