@@ -23,6 +23,38 @@ const TASKBAR_H: u32 = 50;
 const CANVAS_Y: u32 = 50;
 const CANVAS_H: u32 = 620;
 
+
+// ── PL-33: Boot Splash Screen ────────────────────────────────────────────────
+
+pub fn render_splash() {
+    draw_rect(0, 0, 1280, 720, DARK_BG);
+    let cx: u32 = 640;
+    let cy: u32 = 280;
+    let mut i: u32 = 0;
+    while i <= 48 {
+        let w = i * 2 + 1;
+        let x = cx.saturating_sub(i);
+        let y = cy.saturating_sub(48).saturating_add(i);
+        draw_hline(x, y, w, SOVEREIGN_PURPLE);
+        i += 1;
+    }
+    let mut i: u32 = 1;
+    while i <= 48 {
+        let w = (48 - i) * 2 + 1;
+        let x = cx.saturating_sub(48 - i);
+        let y = cy + i;
+        draw_hline(x, y, w, SOVEREIGN_PURPLE);
+        i += 1;
+    }
+    draw_str_2x(530, 370, "AIEONYX", ACCENT_TEAL);
+    draw_str(458, 408, "Sovereign Digital Infrastructure", TEXT_DIM);
+    draw_str(494, 440, "aiXos Phoenix  v0.1.0  aarch64", TEXT_WHITE);
+    draw_str(468, 460, "axon_main() -> 0x4153  [SOVEREIGN]", ACCENT_TEAL);
+    draw_rect(390, 500, 500, 12, PANEL_BG);
+    draw_rect(390, 500, 500, 12, PANEL_BORDER);
+    draw_rect(392, 502, 496, 8, ACCENT_TEAL);
+}
+
 pub fn render_desktop() {
     // Full canvas — clear, flush cache, then redraw
     draw_rect(0, 0, 1280, 720, DARK_BG);

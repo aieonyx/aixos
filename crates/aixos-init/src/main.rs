@@ -182,6 +182,13 @@ pub extern "C" fn aixos_main() -> ! {
     match aixos_gpu::init() {
         Some(_) => {
             uart_write("GPU: ok\n");
+            aixos_gpu::desktop::render_splash();
+            // Volatile read prevents optimizer from eliminating the delay
+            let mut splash_delay = 0u64;
+            while splash_delay < 1_200_000_000 {
+                unsafe { core::ptr::read_volatile(&splash_delay); }
+                splash_delay += 1;
+            }
             aixos_gpu::desktop::render_desktop();
             aixos_gpu::desktop::render_top_bar_icons();
             {
