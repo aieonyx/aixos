@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/aieonyx/aixos/releases/tag/v0.1.0-phoenix-lite">v0.1.0-phoenix-lite</a>
+  <a href="https://github.com/aieonyx/aixos/releases/tag/v1.0.0">v1.0.0</a>
   •
   <a href="https://github.com/aieonyx/AXON">AXONYX Language</a>
   •
@@ -42,7 +42,7 @@
 
 <hr>
 
-## Current State — Phoenix Lite v0.1.0
+## Current State — Phoenix v1.0.0
 
 aiXos Phoenix Lite boots on **QEMU aarch64** via EDK2 UEFI and displays a fully live sovereign desktop.
 
@@ -52,21 +52,24 @@ aiXos Phoenix Lite boots on **QEMU aarch64** via EDK2 UEFI and displays a fully 
 |---------|--------|
 | Bare-metal AArch64 boot via EDK2 + PE/COFF stub | ✅ |
 | ramfb framebuffer — 1280×720 FORMAT_XR24 | ✅ |
-| Three-panel sovereign desktop (Identity / Canvas / System) | ✅ |
+| Boot splash — AIEONYX diamond, wordmark, proof, progress bar | ✅ |
+| Sovereign desktop — top bar, canvas, taskbar | ✅ |
 | Sovereign proof `0x4153 [SOVEREIGN]` — earned, not hardcoded | ✅ |
 | ARPi identity ceremony — hardware-derived node ID | ✅ |
 | AWP-Lite loopback confirmed | ✅ |
 | All 5 Protection Domains live (GENESIS, ARPi, AWP, Shell, BASTION) | ✅ |
-| virtio-input keyboard driver — GTK window + UART both working | ✅ |
-| Live left panel — Node ID, ARPi state, Proof, Boot mode, Arch, Kernel | ✅ |
-| Live right panel — AWP, EdisonDB, Input, Display, HANIEL, BASTION | ✅ |
-| Shell with 10 commands | ✅ |
-| Sovereign floating window primitive | ✅ |
+| virtio-keyboard + virtio-tablet mouse — drag, resize, click | ✅ |
+| EdisonDB live bare-metal store — 32 entries, 3 tiers | ✅ |
+| 5-window system — Node, Shell, EDB, Settings, EDB Browser | ✅ |
+| Shell with 12 commands | ✅ |
+| EDB Browser — navigable list, tier badges, `put` command | ✅ |
+| Window drag, resize, close, focus | ✅ |
 
 ### Shell commands
 
 ```
-help  clear  version  sovereignty  node-id  awp-status  mem  window  close  reboot
+help  clear  version  sovereignty  node-id  awp-status
+mem  db  window  settings  browse  close  reboot
 ```
 
 ### Boot output
@@ -102,12 +105,12 @@ axos>
 
 | Component | Role | Status |
 |-----------|------|--------|
-| aiXos Phoenix | Sovereign desktop OS | **Active — PL-20** |
+| aiXos Phoenix | Sovereign desktop OS | **v1.0.0 — released** |
 | ARPi | Identity ceremony protocol | Hardware-derived node ID live |
 | AWP-Lite | Sovereign network protocol | Loopback confirmed |
 | BASTION | Policy enforcement daemon | Shell loop active |
 | GENESIS PD | Kernel boot proof | Execution is proof |
-| EdisonDB | Sovereign database layer | Stub — integration planned |
+| EdisonDB | Sovereign database layer | **Live bare-metal bridge** |
 | HANIEL | Sovereign render engine | Stub — bare-metal port planned |
 | AXONYX | Sovereign systems language | Compiler complete, OS integration planned |
 | ASL-seL4 | Sovereign Linux + microkernel | v1.0.0-asl complete, separate repo |
@@ -196,42 +199,44 @@ EDK2 UEFI firmware
 | Boot path | EDK2 → PE/COFF stub → `_start` → `aixos_main()` |
 | Sovereign proof | `0x4153` = `AS` in ASCII (AIEONYX Sovereign) |
 | Node ID | Hardware-derived: RAM base XOR fw_cfg XOR seed |
-| Tests | 38 passing, 0 failing |
+| Tests | 42 passing, 0 failing |
 
 <hr>
 
 ## Known Gaps (honest)
 
-- EdisonDB not yet integrated as bare-metal storage (std/tokio dependency)
-- HANIEL bare-metal render engine not yet ported (Tauri dependency)
 - AWP not yet on a real packet path (loopback only)
-- Mouse/cursor not yet implemented
+- HANIEL bare-metal render engine not yet ported
 - x86_64 target not yet supported
 - Node ID is hardware-derived constant, not a cryptographic Ed25519 keypair
+- Liquid-glass aesthetic deferred to v1.1
 
 <hr>
 
 ## Roadmap
 
-### Phoenix Lite — v0.1 ✅
-- Bare-metal boot, ramfb display, three-panel desktop
-- virtio-input keyboard (GTK + UART)
-- All 5 PDs wired — sovereign proof earned
-- Live identity panels, shell, window primitive
+### Phoenix v1.0 ✅ — this release
+- Boot splash: AIEONYX diamond, wordmark, proof hash, progress bar
+- 5-window system: Node, Shell, EDB, Settings, EDB Browser
+- EdisonDB live bare-metal store (32 entries, 3 tiers)
+- EDB Browser: navigable list, tier badges, hex values, `put` command
+- virtio-tablet mouse: drag, resize, click, save-under cursor
+- Settings window: Display / System / Proof / Store / Input / About
+- Window drag, resize, close, focus — all 5 slots
+- Shell: 12 commands
+- All 5 PDs wired — sovereign proof 0x4153 earned
 
-### Phoenix v0.2 — In Progress
-- ⬜ Mouse cursor (virtio-mouse driver)
-- ⬜ EdisonDB bare-metal bridge
-- ⬜ HANIEL bare-metal render surface
-- ⬜ AWP packet path (virtio-net)
-- ⬜ Multi-window management
-
-### Phoenix v1.0 — Future
+### Phoenix v1.1 — Next
+- ⬜ Liquid-glass sovereign desktop aesthetic
 - ⬜ Real Ed25519 ARPi keypair ceremony
+- ⬜ AWP packet path (virtio-net)
+- ⬜ HANIEL bare-metal render surface
 - ⬜ Onyxia browser integration
+
+### Phoenix v2.0 — Future
 - ⬜ Full AXONYX application layer
 - ⬜ x86_64 port
-- ⬜ Liquid-glass sovereign desktop aesthetic
+- ⬜ ASL-seL4 mKernel integration
 
 <hr>
 
