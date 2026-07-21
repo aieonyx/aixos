@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect};
+use crate::framebuffer::cache_flush;
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped};
 
 const DARK_BG:          u32 = 0x0A0A1A;
@@ -21,8 +22,10 @@ const CANVAS_Y: u32 = 50;
 const CANVAS_H: u32 = 620;
 
 pub fn render_desktop() {
-    // Full canvas
-    draw_rect(0, CANVAS_Y, 1280, CANVAS_H, DARK_BG);
+    // Full canvas — clear, flush cache, then redraw
+    draw_rect(0, 0, 1280, 720, DARK_BG);
+    cache_flush();
+    draw_rect(0, 0, 1280, 720, DARK_BG);
     blend_rect(0, CANVAS_Y, 1280, CANVAS_H, SOVEREIGN_PURPLE, 28);
     // Top bar
     draw_rect(0, 0, 1280, TOP_BAR_H, TOP_BAR);
@@ -151,11 +154,11 @@ pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
     None
 }
 
-pub fn render_window(title: &str, lines: &[&str]) {
+pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
-    draw_rect(wx.saturating_sub(1), wy.saturating_sub(1), WIN_W + 2, WIN_H + 2, ACCENT_TEAL);
-    draw_rect(wx, wy, WIN_W, WIN_TITLE_H, WIN_TITLE);
+    draw_rect(wx.saturating_sub(1), wy.saturating_sub(1), w + 2, h + 2, ACCENT_TEAL);
+    draw_rect(wx, wy, w, WIN_TITLE_H, WIN_TITLE);
     let tx = wx + 8;
     let ty = wy + 12;
     draw_hline(tx,                   ty.saturating_sub(4), 1, SOVEREIGN_PURPLE);
@@ -168,18 +171,24 @@ pub fn render_window(title: &str, lines: &[&str]) {
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
     draw_str(wx + 22, wy + 8, title, TEXT_WHITE);
-    draw_str(wx + WIN_W - 62, wy + 8, "[close]", 0x666688);
-    draw_hline(wx, wy + WIN_TITLE_H, WIN_W, ACCENT_TEAL);
-    draw_rect(wx, wy + WIN_TITLE_H + 1, WIN_W, WIN_H - WIN_TITLE_H - 1, WIN_BG);
+    draw_str(wx + w - 62, wy + 8, "[close]", 0x666688);
+    draw_hline(wx, wy + WIN_TITLE_H, w, ACCENT_TEAL);
+    draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
     let mut row = 0u32;
     for line in lines.iter().take(10) {
         draw_str(wx + 12, wy + WIN_TITLE_H + 12 + row * 18, line, TEXT_WHITE);
         row += 1;
     }
+    draw_rect(wx + w - 12, wy + h - 12, 12, 12, ACCENT_TEAL);
+    draw_rect(wx + w - 8, wy + h - 8, 4, 4, TEXT_WHITE);
 }
 
 pub fn render_window_output(wx: i32, wy: i32, lines: &[&'static str], count: usize) {
-    draw_rect((wx + 1) as u32, (wy + 25) as u32, 578, 253, WIN_BG);
+    render_window_output_h(wx, wy, lines, count, WIN_H);
+}
+pub fn render_window_output_h(wx: i32, wy: i32, lines: &[&'static str], count: usize, wh: u32) {
+    let body_h = if wh > 25 { wh - 25 } else { 1 };
+    draw_rect((wx + 1) as u32, (wy + 25) as u32, 578, body_h, WIN_BG);
     let n = if count > 8 { 8 } else { count };
     let mut y = wy + 30;
     let mut idx = 0;
@@ -191,8 +200,12 @@ pub fn render_window_output(wx: i32, wy: i32, lines: &[&'static str], count: usi
 }
 
 pub fn render_window_input(wx: i32, wy: i32, buf: &[u8], len: usize, focused: bool) {
-    let y = wy + 280;
-    draw_rect((wx + 4) as u32, (y - 2) as u32, 572, 18, WIN_BG);
+    render_window_input_h(wx, wy, buf, len, focused, WIN_H);
+}
+pub fn render_window_input_h(wx: i32, wy: i32, buf: &[u8], len: usize, focused: bool, wh: u32) {
+    let y = wy + wh as i32 - 20;
+    let y = if y < wy + 30 { wy + 30 } else { y };
+    draw_rect((wx + 4) as u32, (y - 2) as u32, (wh.min(580)) as u32, 18, WIN_BG);
     draw_str((wx + 8) as u32, y as u32, "win> ", ACCENT_TEAL);
     if let Ok(txt) = core::str::from_utf8(&buf[..len]) {
         draw_str((wx + 48) as u32, y as u32, txt, TEXT_WHITE);
@@ -201,6 +214,13 @@ pub fn render_window_input(wx: i32, wy: i32, buf: &[u8], len: usize, focused: bo
     if focused {
         draw_str((wx + 500) as u32, y as u32, "[focused]", TEXT_DIM);
     }
+}
+
+pub fn clear_window_sized(w: u32, h: u32) {
+    let wx = unsafe { CUR_WIN_X as u32 };
+    let wy = unsafe { CUR_WIN_Y as u32 };
+    draw_rect(wx.saturating_sub(2), wy.saturating_sub(2), w + 4, h + 4, DARK_BG);
+    blend_rect(wx.saturating_sub(2), wy.saturating_sub(2), w + 4, h + 4, SOVEREIGN_PURPLE, 28);
 }
 
 pub fn clear_window() {

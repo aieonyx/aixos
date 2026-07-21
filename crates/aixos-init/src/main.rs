@@ -97,11 +97,11 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 
 
 #[derive(Clone, Copy)]
-struct WinSlot { open: bool, kind: u8, x: i32, y: i32 }
+struct WinSlot { open: bool, kind: u8, x: i32, y: i32, w: u32, h: u32 }
 static mut WINS: [WinSlot; 3] = [
-    WinSlot { open: false, kind: 0, x: 200, y: 80 },
-    WinSlot { open: false, kind: 0, x: 230, y: 110 },
-    WinSlot { open: false, kind: 0, x: 260, y: 140 },
+    WinSlot { open: false, kind: 0, x: 200, y: 80, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 230, y: 110, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 260, y: 140, w: 580, h: 300 },
 ];
 static mut ACTIVE_WIN: usize = 0;
 static mut DRAG_WIN: usize = 0;
@@ -114,6 +114,8 @@ static mut ECHO_NEXT: usize = 0;
 static mut DRAG_ACTIVE: bool = false;
 static mut DRAG_OFF_X: i32 = 0;
 static mut DRAG_OFF_Y: i32 = 0;
+static mut RESIZE_ACTIVE: bool = false;
+static mut RESIZE_WIN: usize = 0;
 
 #[no_mangle]
 pub extern "C" fn aixos_main() -> ! {
@@ -207,27 +209,37 @@ fn render_window_for_slot(i: usize) {
             aixos_gpu::desktop::render_window(
                 "Shell - aiXos Phoenix",
                 &["axos> sovereign shell", "type commands below", "",
-                  "PL-24: shell window stub"]);
+                  "PL-24: shell window stub"],
+                w.w, w.h);
             unsafe {
                 let focused = WINDOW_FOCUSED && ACTIVE_WIN == i;
-                aixos_gpu::desktop::render_window_output(w.x, w.y, win_output(), WIN_OUTPUT_LEN);
+                aixos_gpu::desktop::render_window_output_h(w.x, w.y, win_output(), WIN_OUTPUT_LEN, w.h);
                 let b = win_buf();
-                aixos_gpu::desktop::render_window_input(w.x, w.y, b.as_slice(), b.len, focused);
+                aixos_gpu::desktop::render_window_input_h(w.x, w.y, b.as_slice(), b.len, focused, w.h);
             }
         }
         2 => aixos_gpu::desktop::render_window(
             "EdisonDB - Sovereign Store",
             &["Status: live", "Entries: (see db command)",
               "boot:proof = 0x4153", "boot:node_id = stored",
-              "Tier: Critical / Personal / Noise"]),
+              "Tier: Critical / Personal / Noise"],
+            w.w, w.h),
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
-              "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"]),
+              "Proof: 0x4153 [SOVEREIGN]", "type close to dismiss"],
+            w.w, w.h),
     }
 }
 
+fn render_windows_only() {
+    render_all_windows();
+}
+
 fn render_all_windows() {
+    aixos_gpu::desktop::render_desktop();
+    aixos_gpu::desktop::render_top_bar_icons();
+    aixos_gpu::desktop::render_status_bar("aiXos Phoenix : axon_main() -> 0x4153 : Sovereign");
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 3 {
@@ -348,9 +360,17 @@ fn handle_click(x: i32, y: i32) {
             if k > 1 && i == order[0] { continue; }
             let w = wins()[i];
             if !w.open { continue; }
-            if x >= w.x && x < w.x + 580 && y >= w.y && y < w.y + 24 {
+            if x >= w.x + w.w as i32 - 20 && x < w.x + w.w as i32
+                && y >= w.y + w.h as i32 - 20 && y < w.y + w.h as i32 {
                 ACTIVE_WIN = i;
-                if x >= w.x + 518 && x < w.x + 580 {
+                RESIZE_WIN = i;
+                RESIZE_ACTIVE = true;
+                render_all_windows();
+                return;
+            }
+            if x >= w.x && x < w.x + w.w as i32 && y >= w.y && y < w.y + 24 {
+                ACTIVE_WIN = i;
+                if x >= w.x + w.w as i32 - 62 && x < w.x + w.w as i32 {
                     wins()[i].open = false;
                     WINDOW_FOCUSED = false;
                     aixos_gpu::desktop::set_window_pos(w.x, w.y);
@@ -367,7 +387,7 @@ fn handle_click(x: i32, y: i32) {
                 render_all_windows();
                 return;
             }
-            if x >= w.x && x < w.x + 580 && y >= w.y + 24 && y < w.y + 300 {
+            if x >= w.x && x < w.x + w.w as i32 && y >= w.y + 24 && y < w.y + w.h as i32 {
                 ACTIVE_WIN = i;
                 if w.kind == 1 {
                     WINDOW_FOCUSED = true;
@@ -405,18 +425,30 @@ fn shell_loop(
             if m.poll(&mut mouse_state) {
                 aixos_gpu::erase_cursor(old_x, old_y);
                 unsafe {
+                    if RESIZE_ACTIVE && !mouse_state.left {
+                        // Apply resize only on release — no intermediate frames
+                        let nw = ((mouse_state.x - wins()[RESIZE_WIN].x) as u32).clamp(300, 900);
+                        let nh = ((mouse_state.y - wins()[RESIZE_WIN].y) as u32).clamp(200, 600);
+                        wins()[RESIZE_WIN].w = nw;
+                        wins()[RESIZE_WIN].h = nh;
+                        RESIZE_ACTIVE = false;
+                        DRAG_ACTIVE = false;
+                        render_all_windows();
+                    }
+                    if !mouse_state.left { RESIZE_ACTIVE = false; DRAG_ACTIVE = false; }
                     const DRAG_MIN_X: i32 = 0; const DRAG_MAX_X: i32 = 700;
-                    if DRAG_ACTIVE && mouse_state.left {
+                    if !RESIZE_ACTIVE && DRAG_ACTIVE && mouse_state.left {
                         let dw = DRAG_WIN;
                         let w = wins()[dw];
                         let nx = (mouse_state.x - DRAG_OFF_X).clamp(DRAG_MIN_X, DRAG_MAX_X);
                         let ny = (mouse_state.y - DRAG_OFF_Y).clamp(50, 368);
                         if nx != w.x || ny != w.y {
+                            // Erase old position before moving
                             aixos_gpu::desktop::set_window_pos(w.x, w.y);
-                            aixos_gpu::desktop::clear_window();
+                            aixos_gpu::desktop::clear_window_sized(w.w + 10, w.h + 10);
                             wins()[dw].x = nx;
                             wins()[dw].y = ny;
-                            render_all_windows();
+                            render_windows_only();
                         }
                     }
                     if !mouse_state.left { DRAG_ACTIVE = false; }
