@@ -46,10 +46,10 @@ pub fn render_splash() {
         draw_hline(x, y, w, SOVEREIGN_PURPLE);
         i += 1;
     }
-    draw_str_2x(530, 370, "AIEONYX", ACCENT_TEAL);
-    draw_str(458, 408, "Sovereign Digital Infrastructure", TEXT_DIM);
-    draw_str(494, 440, "aiXos Phoenix  v0.1.0  aarch64", TEXT_WHITE);
-    draw_str(468, 460, "axon_main() -> 0x4153  [SOVEREIGN]", ACCENT_TEAL);
+    draw_str_2x(584, 370, "AIEONYX", ACCENT_TEAL);
+    draw_str(512, 408, "Sovereign Digital Infrastructure", TEXT_DIM);
+    draw_str(516, 440, "aiXos Phoenix  v0.1.0  aarch64", TEXT_WHITE);
+    draw_str(504, 460, "axon_main() -> 0x4153  [SOVEREIGN]", ACCENT_TEAL);
     draw_rect(390, 500, 500, 12, PANEL_BG);
     draw_rect(390, 500, 500, 12, PANEL_BORDER);
     draw_rect(392, 502, 496, 8, ACCENT_TEAL);
