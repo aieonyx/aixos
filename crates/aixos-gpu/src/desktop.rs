@@ -187,8 +187,11 @@ pub fn render_window_output(wx: i32, wy: i32, lines: &[&'static str], count: usi
     render_window_output_h(wx, wy, lines, count, WIN_H);
 }
 pub fn render_window_output_h(wx: i32, wy: i32, lines: &[&'static str], count: usize, wh: u32) {
-    let body_h = if wh > 25 { wh - 25 } else { 1 };
-    draw_rect((wx + 1) as u32, (wy + 25) as u32, 578, body_h, WIN_BG);
+    render_window_output_hw(wx, wy, lines, count, wh, 578);
+}
+pub fn render_window_output_hw(wx: i32, wy: i32, lines: &[&'static str], count: usize, wh: u32, ww: u32) {
+    let body_h = if wh > 45 { wh - 45 } else { 1 };
+    draw_rect((wx + 1) as u32, (wy + 25) as u32, ww.saturating_sub(4), body_h, WIN_BG);
     let n = if count > 8 { 8 } else { count };
     let mut y = wy + 30;
     let mut idx = 0;

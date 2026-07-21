@@ -213,7 +213,7 @@ fn render_window_for_slot(i: usize) {
                 w.w, w.h);
             unsafe {
                 let focused = WINDOW_FOCUSED && ACTIVE_WIN == i;
-                aixos_gpu::desktop::render_window_output_h(w.x, w.y, win_output(), WIN_OUTPUT_LEN, w.h);
+                aixos_gpu::desktop::render_window_output_hw(w.x, w.y, win_output(), WIN_OUTPUT_LEN, w.h, w.w);
                 let b = win_buf();
                 aixos_gpu::desktop::render_window_input_h(w.x, w.y, b.as_slice(), b.len, focused, w.h);
             }
@@ -233,7 +233,19 @@ fn render_window_for_slot(i: usize) {
 }
 
 fn render_windows_only() {
-    render_all_windows();
+    let active = unsafe { ACTIVE_WIN };
+    let mut i = 0;
+    while i < 3 {
+        if i != active { render_window_for_slot(i); }
+        i += 1;
+    }
+    render_window_for_slot(active);
+    let slots = unsafe {[
+        (wins()[0].open, wins()[0].kind),
+        (wins()[1].open, wins()[1].kind),
+        (wins()[2].open, wins()[2].kind),
+    ]};
+    aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
 
 fn render_all_windows() {
