@@ -201,7 +201,6 @@ pub extern "C" fn aixos_main() -> ! {
                 ]};
                 aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
             }
-            aixos_gpu::desktop::render_status_bar("aiXos Phoenix : axon_main() -> 0x4153 : Sovereign");
             uart_write("Desktop rendered\n");
         }
         None => { uart_write("GPU: none\n"); }
@@ -326,6 +325,8 @@ fn render_window_for_slot(i: usize) {
 }
 
 fn render_windows_only() {
+    aixos_gpu::desktop::render_desktop();
+    aixos_gpu::desktop::render_top_bar_icons();
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 5 {
@@ -346,7 +347,6 @@ fn render_windows_only() {
 fn render_all_windows() {
     aixos_gpu::desktop::render_desktop();
     aixos_gpu::desktop::render_top_bar_icons();
-    aixos_gpu::desktop::render_status_bar("aiXos Phoenix : axon_main() -> 0x4153 : Sovereign");
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 5 {
@@ -369,14 +369,20 @@ fn render_all_windows() {
 
 fn handle_dock_click(x: i32, y: i32) {
     if let Some(icon) = aixos_gpu::desktop::dock_icon_at(x, y) {
+        let kind: u8 = match icon {
+            2 => 1, // Shell
+            4 => 2, // EDB store
+            6 => 3, // Settings
+            _ => return,
+        };
         unsafe {
             WINDOW_FOCUSED = false;
-            if let Some(i) = find_kind(icon) {
+            if let Some(i) = find_kind(kind) {
                 ACTIVE_WIN = i;
             } else {
                 let slot = find_free().unwrap_or(0);
                 wins()[slot].open = true;
-                wins()[slot].kind = icon;
+                wins()[slot].kind = kind;
                 ACTIVE_WIN = slot;
             }
         }
@@ -572,18 +578,8 @@ fn handle_click(x: i32, y: i32) {
                 return;
             }
         }
-        if y > 50 && y < 670 && x > 0 && x < 1280 {
-            WINDOW_FOCUSED = false;
-            if let Some(i) = find_kind(0) {
-                ACTIVE_WIN = i;
-            } else {
-                let slot = find_free().unwrap_or(0);
-                wins()[slot].open = true;
-                wins()[slot].kind = 0;
-                ACTIVE_WIN = slot;
-            }
-            render_all_windows();
-        }
+        // Empty canvas click — no action (sovereign desktop)
+        let _ = (x, y);
     }
 }
 
@@ -592,7 +588,6 @@ fn shell_loop(
     mut mouse_state: aixos_input::mouse::MouseState,
 ) -> ! {
     let mut buf = ShellBuf::new();
-    aixos_gpu::desktop::render_input_line(b"", 0);
     loop {
         if let Some(ref mut m) = mouse {
             let old_x = mouse_state.x;
@@ -663,18 +658,15 @@ fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
             if !result.is_empty() {
                 uart_write(result);
                 uart_write("\n");
-                aixos_gpu::desktop::render_command_result(result);
-            }
+                }
             buf.clear();
             let mut d = 0u64;
             while d < 5_000_000 { d += 1; }
-            aixos_gpu::desktop::render_input_line(b"", 0);
-            uart_write("axos> ");
+                    uart_write("axos> ");
         }
         1 => {
             buf.clear();
-            aixos_gpu::desktop::render_input_line(b"", 0);
-            uart_write_byte(b'\r');
+                    uart_write_byte(b'\r');
             uart_write("axos> ");
         }
         14 => {
@@ -682,7 +674,6 @@ fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
                 uart_write_byte(0x08);
                 uart_write_byte(b' ');
                 uart_write_byte(0x08);
-                aixos_gpu::desktop::render_input_line(buf.as_slice(), buf.len);
             }
         }
         _ => {
@@ -691,8 +682,7 @@ fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
                 if (0x20..0x7fu8).contains(&b) {
                     if buf.push(b) {
                         uart_write_byte(b);
-                        aixos_gpu::desktop::render_input_line(buf.as_slice(), buf.len);
-                    }
+                            }
                 }
             }
         }

@@ -5,7 +5,8 @@ use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect};
 use crate::framebuffer::cache_flush;
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32};
 
-const DARK_BG:          u32 = 0x0A0A1A;
+const DARK_BG:          u32 = 0x0D0B1F;
+const DARK_BG2:         u32 = 0x1A0E2E;
 const PANEL_BG:         u32 = 0x141428;
 const PANEL_BORDER:     u32 = 0x2A2A4A;
 const TEXT_WHITE:       u32 = 0xEEEEFF;
@@ -17,11 +18,16 @@ const ACCENT_TEAL:      u32 = 0x1BAF7A;
 const ACCENT_AMBER:     u32 = 0xD4A017;
 const SETTINGS_BLUE:    u32 = 0x1B7FC4;
 const BROWSE_GREEN:     u32 = 0x2A7A4A;
-const TOP_BAR_H: u32 = 50;
-const TASKBAR_Y: u32 = 670;
-const TASKBAR_H: u32 = 50;
-const CANVAS_Y: u32 = 50;
-const CANVAS_H: u32 = 620;
+const TOP_BAR_H:  u32 = 38;
+const DOCK_Y:     u32 = 676;
+const DOCK_H:     u32 = 44;
+const PANEL_W:    u32 = 180;
+const TASKBAR_Y:  u32 = 676;
+const TASKBAR_H:  u32 = 44;
+const CANVAS_Y:   u32 = 38;
+const CANVAS_H:   u32 = 638;
+const GLASS_PANEL: u32 = 0x0F0D22;
+const GLASS_BORDER: u32 = 0x2A2840;
 
 
 // ── PL-33: Boot Splash Screen ────────────────────────────────────────────────
@@ -56,148 +62,166 @@ pub fn render_splash() {
 }
 
 pub fn render_desktop() {
-    // Full canvas — clear, flush cache, then redraw
-    draw_rect(0, 0, 1280, 720, DARK_BG);
-    cache_flush();
-    draw_rect(0, 0, 1280, 720, DARK_BG);
-    blend_rect(0, CANVAS_Y, 1280, CANVAS_H, SOVEREIGN_PURPLE, 28);
-    // Top bar
-    draw_rect(0, 0, 1280, TOP_BAR_H, TOP_BAR);
-    draw_hline(0, TOP_BAR_H, 1280, PANEL_BORDER);
-    // Taskbar
-    draw_rect(0, TASKBAR_Y, 1280, TASKBAR_H, DOCK_BG);
-    draw_hline(0, TASKBAR_Y, 1280, PANEL_BORDER);
-    // AIEONYX diamond centered at (640, 360)
-    let cx: u32 = 640;
-    let cy: u32 = 360;
-    let mut i: u32 = 0;
-    while i <= 20 {
-        let w = i * 2 + 1;
-        let x = cx.saturating_sub(i);
-        let y = cy.saturating_sub(20).saturating_add(i);
-        draw_hline(x, y, w, SOVEREIGN_PURPLE);
-        i += 1;
+    let mut by: u32 = 0;
+    while by < 720 {
+        let t = (by * 255 / 720) as u8;
+        let r = 0x0Du8.saturating_add((((0x1Au32.saturating_sub(0x0D)) * t as u32) / 255) as u8);
+        let g = 0x0Bu8.saturating_add((((0x0Eu32.saturating_sub(0x0B)) * t as u32) / 255) as u8);
+        let b = 0x1Fu8.saturating_add((((0x2Eu32.saturating_sub(0x1F)) * t as u32) / 255) as u8);
+        let color = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
+        draw_hline(0, by, 1280, color);
+        by += 1;
     }
-    let mut i: u32 = 1;
-    while i <= 20 {
-        let w = (20 - i) * 2 + 1;
-        let x = cx.saturating_sub(20 - i);
-        let y = cy + i;
-        draw_hline(x, y, w, SOVEREIGN_PURPLE);
-        i += 1;
+    let stars: [(u32, u32); 12] = [
+        (120,80),(340,40),(580,90),(700,50),(50,200),(750,300),
+        (200,420),(650,440),(900,150),(1100,80),(450,350),(1050,500),
+    ];
+    for (sx, sy) in stars.iter() {
+        draw_rect(*sx, *sy, 2, 2, 0xCCCCDD);
     }
-    // Teal indicator dot top-right
-    draw_rect(1260, 18, 8, 8, ACCENT_TEAL);
+    // Left glass panel
+    draw_rect(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_PANEL);
+    draw_border(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_BORDER);
+    draw_hline(9, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
+    draw_str(24, TOP_BAR_H + 28, "IDENTITY", 0x44446A);
+    draw_rect(20, TOP_BAR_H + 42, 32, 32, SOVEREIGN_PURPLE);
+    blend_rect(20, TOP_BAR_H + 42, 32, 32, 0xFFFFFF, 20);
+    draw_str(30, TOP_BAR_H + 63, "E", TEXT_WHITE);
+    draw_str(60, TOP_BAR_H + 55, "Edison", TEXT_WHITE);
+    draw_str(60, TOP_BAR_H + 68, "Sovereign", 0x44446A);
+    draw_hline(16, TOP_BAR_H + 90, PANEL_W - 16, GLASS_BORDER);
+    draw_str(24, TOP_BAR_H + 108, "SPACES", 0x44446A);
+    draw_rect(16, TOP_BAR_H + 116, PANEL_W - 16, 24, SOVEREIGN_PURPLE);
+    blend_rect(16, TOP_BAR_H + 116, PANEL_W - 16, 24, 0x000000, 180);
+    draw_rect(24, TOP_BAR_H + 122, 3, 12, SOVEREIGN_PURPLE);
+    draw_str(34, TOP_BAR_H + 130, "Desktop", TEXT_WHITE);
+    draw_rect(24, TOP_BAR_H + 150, 3, 10, 0x33334A);
+    draw_str(34, TOP_BAR_H + 158, "Files", 0x55556A);
+    draw_rect(24, TOP_BAR_H + 170, 3, 10, 0x33334A);
+    draw_str(34, TOP_BAR_H + 178, "Onyxia", 0x55556A);
+    draw_rect(24, TOP_BAR_H + 190, 3, 10, 0x33334A);
+    draw_str(34, TOP_BAR_H + 198, "EdisonDB", 0x55556A);
+    draw_hline(16, TOP_BAR_H + 218, PANEL_W - 16, GLASS_BORDER);
+    draw_str(24, TOP_BAR_H + 234, "BASTION STATUS", 0x44446A);
+    draw_rect(24, TOP_BAR_H + 248, 8, 8, ACCENT_TEAL);
+    draw_str(38, TOP_BAR_H + 256, "Policy active", 0x888899);
+    draw_rect(24, TOP_BAR_H + 264, 8, 8, ACCENT_TEAL);
+    draw_str(38, TOP_BAR_H + 272, "AWP signed", 0x888899);
+    draw_rect(24, TOP_BAR_H + 280, 8, 8, SOVEREIGN_PURPLE);
+    draw_str(38, TOP_BAR_H + 288, "ARPi verified", 0x888899);
+    // Right glass panel
+    let rx: u32 = 1280 - PANEL_W - 8;
+    draw_rect(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_PANEL);
+    draw_border(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_BORDER);
+    draw_hline(rx + 1, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
+    draw_str(rx + 16, TOP_BAR_H + 28, "SYSTEM", 0x44446A);
+    let icon_labels: [&str; 6] = ["O","F","S","A","D","N"];
+    let icon_colors: [u32; 6] = [SOVEREIGN_PURPLE,0x1850A0,SETTINGS_BLUE,0x8B4FDB,BROWSE_GREEN,ACCENT_TEAL];
+    let mut ii = 0u32;
+    while ii < 6 {
+        let col = ii % 3;
+        let row = ii / 3;
+        let ix = rx + 16 + col * 44;
+        let iy = TOP_BAR_H + 42 + row * 44;
+        draw_rect(ix, iy, 36, 36, icon_colors[ii as usize]);
+        blend_rect(ix, iy, 36, 36, 0x000000, 160);
+        blend_rect(ix, iy, 36, 18, 0xFFFFFF, 15);
+        draw_border(ix, iy, 36, 36, 0x44446A);
+        draw_str(ix + 12, iy + 22, icon_labels[ii as usize], TEXT_WHITE);
+        ii += 1;
+    }
+    draw_hline(rx + 8, TOP_BAR_H + 138, PANEL_W - 16, GLASS_BORDER);
+    draw_str(rx + 16, TOP_BAR_H + 156, "RESOURCES", 0x44446A);
+    draw_str(rx + 16, TOP_BAR_H + 174, "CPU", 0x888899);
+    draw_rect(rx + 16, TOP_BAR_H + 180, PANEL_W - 32, 4, 0x22224A);
+    draw_rect(rx + 16, TOP_BAR_H + 180, (PANEL_W - 32) * 30 / 100, 4, SOVEREIGN_PURPLE);
+    draw_str(rx + PANEL_W - 40, TOP_BAR_H + 184, "30%", 0x44446A);
+    draw_str(rx + 16, TOP_BAR_H + 196, "MEM", 0x888899);
+    draw_rect(rx + 16, TOP_BAR_H + 202, PANEL_W - 32, 4, 0x22224A);
+    draw_rect(rx + 16, TOP_BAR_H + 202, (PANEL_W - 32) * 55 / 100, 4, ACCENT_TEAL);
+    draw_str(rx + PANEL_W - 40, TOP_BAR_H + 206, "55%", 0x44446A);
+    draw_hline(rx + 8, TOP_BAR_H + 220, PANEL_W - 16, GLASS_BORDER);
+    draw_str(rx + 16, TOP_BAR_H + 238, "NETWORK", 0x44446A);
+    draw_rect(rx + 16, TOP_BAR_H + 252, 8, 8, ACCENT_TEAL);
+    draw_str(rx + 30, TOP_BAR_H + 260, "AWP mesh active", 0x888899);
+    draw_str(rx + 16, TOP_BAR_H + 276, "0 peers  local only", 0x33334A);
 }
 
-pub fn render_status_bar(text: &str) {
-    draw_str_2x(430, 16, text, TEXT_WHITE);
-}
 
 pub fn render_top_bar_icons() {
-    // ── Node — hexagon centered in 60x34 ─────────────────────────────────────
-    draw_rect(8, 8, 60, 34, ACCENT_TEAL);
-    blend_rect(8, 8, 60, 34, 0xFFFFFF, 10);
-    draw_hline(9, 8, 58, 0x1DA080);
-    let (hx, hy): (u32, u32) = (30, 16);
-    draw_hline(hx + 4, hy,      8, TEXT_WHITE);
-    draw_hline(hx + 2, hy + 2, 12, TEXT_WHITE);
-    draw_hline(hx,     hy + 4, 16, TEXT_WHITE);
-    draw_hline(hx,     hy + 6,  2, TEXT_WHITE);
-    draw_hline(hx + 14,hy + 6,  2, TEXT_WHITE);
-    draw_hline(hx + 2, hy + 6, 12, TEXT_WHITE);
-    draw_hline(hx + 2, hy + 8, 12, TEXT_WHITE);
-    draw_hline(hx + 4, hy + 10, 8, TEXT_WHITE);
-    draw_rect(hx + 2, hy + 2, 12, 8, ACCENT_TEAL);
-    draw_rect(hx + 6, hy + 4,  4, 4, TEXT_WHITE);
-
-    // ── Shell — >_ prompt centered in 60x34 ──────────────────────────────────
-    draw_rect(76, 8, 60, 34, ACCENT_AMBER);
-    blend_rect(76, 8, 60, 34, 0xFFFFFF, 8);
-    draw_hline(77, 8, 58, 0xB8860B);
-    let (sx, sy): (u32, u32) = (90, 14);
-    draw_hline(sx,     sy,      3, TEXT_WHITE);
-    draw_hline(sx + 3, sy + 3,  3, TEXT_WHITE);
-    draw_hline(sx + 6, sy + 6,  3, TEXT_WHITE);
-    draw_hline(sx + 3, sy + 9,  3, TEXT_WHITE);
-    draw_hline(sx,     sy + 12, 3, TEXT_WHITE);
-    draw_hline(sx + 6, sy + 15, 10, TEXT_WHITE);
-
-    // ── EDB — stacked discs centered in 60x34 ────────────────────────────────
-    draw_rect(144, 8, 60, 34, SOVEREIGN_PURPLE);
-    blend_rect(144, 8, 60, 34, 0xFFFFFF, 8);
-    draw_hline(145, 8, 58, 0x5A2FA0);
-    let (dx, dy): (u32, u32) = (156, 12);
-    draw_rect(dx, dy,      28, 4, TEXT_WHITE);
-    draw_rect(dx, dy + 6,  28, 4, TEXT_WHITE);
-    draw_rect(dx, dy + 12, 28, 4, TEXT_WHITE);
-    draw_rect(dx + 2, dy,  2, 2, SOVEREIGN_PURPLE);
-    draw_rect(dx + 24,dy,  2, 2, SOVEREIGN_PURPLE);
-
-    // ── Set — gear centered in 60x34 ─────────────────────────────────────────
-    draw_rect(212, 8, 60, 34, SETTINGS_BLUE);
-    blend_rect(212, 8, 60, 34, 0xFFFFFF, 8);
-    draw_hline(213, 8, 58, 0x2A4A80);
-    let (gx, gy): (u32, u32) = (234, 15);
-    draw_hline(gx + 4, gy,       8, TEXT_WHITE);
-    draw_hline(gx + 2, gy + 2,  12, TEXT_WHITE);
-    draw_hline(gx,     gy + 4,  16, TEXT_WHITE);
-    draw_hline(gx,     gy + 6,  16, TEXT_WHITE);
-    draw_hline(gx,     gy + 8,  16, TEXT_WHITE);
-    draw_hline(gx,     gy + 10, 16, TEXT_WHITE);
-    draw_hline(gx + 2, gy + 12, 12, TEXT_WHITE);
-    draw_hline(gx + 4, gy + 14,  8, TEXT_WHITE);
-    draw_rect(gx + 4, gy + 4,   8, 8, SETTINGS_BLUE);
-    draw_rect(gx + 6, gy + 6,   4, 4, TEXT_WHITE);
-    draw_rect(gx + 6, gy,       4, 2, SETTINGS_BLUE);
-    draw_rect(gx + 6, gy + 14,  4, 2, SETTINGS_BLUE);
-    draw_rect(gx,     gy + 6,   2, 4, SETTINGS_BLUE);
-    draw_rect(gx + 14,gy + 6,   2, 4, SETTINGS_BLUE);
-
-    // ── Brw — 2x2 grid centered in 60x34 ─────────────────────────────────────
-    draw_rect(280, 8, 60, 34, BROWSE_GREEN);
-    blend_rect(280, 8, 60, 34, 0xFFFFFF, 8);
-    draw_hline(281, 8, 58, 0x1A5A3A);
-    let (bx, by): (u32, u32) = (303, 15);
-    draw_rect(bx,     by,     7, 7, TEXT_WHITE);
-    draw_rect(bx + 9, by,     7, 7, TEXT_WHITE);
-    draw_rect(bx,     by + 9, 7, 7, TEXT_WHITE);
-    draw_rect(bx + 9, by + 9, 7, 7, TEXT_WHITE);
-    draw_rect(bx + 7, by,     2, 16, BROWSE_GREEN);
-    draw_rect(bx,     by + 7,16,  2, BROWSE_GREEN);
+    draw_rect(0, 0, 1280, TOP_BAR_H, 0x08060F);
+    draw_hline(0, 0, 1280, 0x2A2848);
+    draw_hline(0, TOP_BAR_H - 1, 1280, 0x1A1830);
+    draw_rect(12, 13, 14, 2, TEXT_WHITE);
+    draw_rect(12, 18, 10, 2, TEXT_WHITE);
+    draw_rect(12, 23, 12, 2, TEXT_WHITE);
+    draw_str(34, 15, "aiXos Phoenix", TEXT_WHITE);
+    draw_rect(380, 8, 240, 22, 0x14122A);
+    draw_border(380, 8, 240, 22, 0x2A2848);
+    draw_str(406, 19, "Ask IAM anything...", 0x33334A);
+    draw_str(1200, 19, "19:24", 0x888899);
+    draw_rect(1192, 15, 6, 6, ACCENT_TEAL);
 }
+
 
 pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
-    draw_rect(0, TASKBAR_Y, 1280, TASKBAR_H, DOCK_BG);
-    draw_hline(0, TASKBAR_Y, 1280, PANEL_BORDER);
-    let names = ["Node", "Shell", "EDB", "Set", "Brw"];
-    let mut btn_x: u32 = 8;
-    let mut i = 0;
-    while i < 5 {
-        if slots[i].0 {
-            let kind = slots[i].1 as usize;
-            let name = if kind < 5 { names[kind] } else { "Win" };
-            let color = if i == active { ACCENT_TEAL } else { PANEL_BG };
-            draw_rect(btn_x, TASKBAR_Y + 8, 110, 34, color);
-            draw_border(btn_x, TASKBAR_Y + 8, 110, 34, PANEL_BORDER);
-            draw_str(btn_x + 8, TASKBAR_Y + 20, name, TEXT_WHITE);
-            btn_x += 118;
-        }
-        i += 1;
+    draw_rect(0, DOCK_Y, 1280, DOCK_H, 0x0A0818);
+    draw_hline(0, DOCK_Y, 1280, 0x1A1830);
+    // 7 icons x 34px + 6px gap = 280px icons
+    // + 10px left pad + 10px right pad + separator + axos> = ~420px total
+    let dock_w: u32 = 420;
+    let dock_x: u32 = (1280 - dock_w) / 2;
+    let dock_py: u32 = DOCK_Y + 4;
+    draw_rect(dock_x, dock_py, dock_w, 36, 0x100E20);
+    draw_border(dock_x, dock_py, dock_w, 36, 0x2A2848);
+    draw_hline(dock_x + 1, dock_py + 1, dock_w - 2, 0x3A3858);
+    // 7 app icons, 34x26 each, 6px gap, start at dock_x+10
+    let labels: [&str; 7] = ["O", "W", ">_", "F", "D", "I", "S"];
+    let colors: [u32; 7] = [
+        SOVEREIGN_PURPLE, 0x1850A0, ACCENT_AMBER,
+        0x2A6A3A, BROWSE_GREEN, 0x8B4FDB, SETTINGS_BLUE,
+    ];
+    let icon_w: u32 = 30;
+    let icon_gap: u32 = 6;
+    let mut di = 0u32;
+    while di < 7 {
+        let ix = dock_x + 10 + di * (icon_w + icon_gap);
+        let iy = dock_py + 5;
+        draw_rect(ix, iy, icon_w, 26, colors[di as usize]);
+        blend_rect(ix, iy, icon_w, 26, 0x000000, 120);
+        blend_rect(ix, iy, icon_w, 13, 0xFFFFFF, 20);
+        draw_border(ix, iy, icon_w, 26, 0x33334A);
+        draw_str(ix + 9, iy + 17, labels[di as usize], TEXT_WHITE);
+        di += 1;
     }
-    // axos> prompt at right
-    draw_str(1100, TASKBAR_Y + 20, "axos>", TEXT_DIM);
+    // Separator
+    let sep_x = dock_x + 10 + 7 * (icon_w + icon_gap) + 4;
+    draw_rect(sep_x, dock_py + 8, 1, 20, 0x2A2848);
+    // axos> prompt — right of separator, vertically centered
+    draw_str(sep_x + 8, dock_py + 22, "axos>", 0x555570);
+    draw_rect(sep_x + 52, dock_py + 13, 5, 12, SOVEREIGN_PURPLE);
+    // Open window indicators — teal dot above icon
+    let mut wi = 0usize;
+    while wi < slots.len() {
+        if slots[wi].0 {
+            let kind = slots[wi].1 as u32;
+            // Map window kind to dock icon index
+            let dock_idx: u32 = match kind {
+                1 => 2, // Shell -> >_
+                2 => 4, // EDB  -> D
+                3 => 6, // Set  -> S
+                4 => 4, // EDB browser -> D
+                _ => 0,
+            };
+            let dot_x = dock_x + 10 + dock_idx * (icon_w + icon_gap) + icon_w / 2 - 3;
+            draw_rect(dot_x, dock_py + 2, 6, 2, ACCENT_TEAL);
+        }
+        wi += 1;
+    }
+    let _ = active;
 }
 
-/// Left panel — Sovereign Identity Space
-/// Shows node identity, ARPi ceremony state, boot proof.
 
-
-/// Right panel — System Space
-/// Shows AWP status, EdisonDB state, input driver, display.
-
-
-/// Update right panel input driver status after virtio init
 pub fn render_right_panel_input(virtio_ok: bool) {
     draw_rect(1088, 152, 180, 12, PANEL_BG);
     if virtio_ok {
@@ -247,12 +271,17 @@ pub fn get_window_pos() -> (i32, i32) {
 }
 
 pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
-    if y < 8 || y > 42 { return None; }
-    if x >= 8 && x < 68 { return Some(0); }
-    if x >= 76 && x < 136 { return Some(1); }
-    if x >= 144 && x < 204 { return Some(2); }
-    if x >= 212 && x < 272 { return Some(3); }
-    if x >= 280 && x < 340 { return Some(4); }
+    let dy = DOCK_Y as i32;
+    if y < dy || y > dy + 44 { return None; }
+    let dock_x: i32 = (1280 - 420) / 2;
+    let icon_w: i32 = 30;
+    let icon_gap: i32 = 6;
+    let mut i = 0u8;
+    while i < 7 {
+        let ix = dock_x + 10 + (i as i32) * (icon_w + icon_gap);
+        if x >= ix && x < ix + icon_w { return Some(i); }
+        i += 1;
+    }
     None
 }
 
@@ -411,12 +440,10 @@ pub fn clear_window_sized(w: u32, h: u32) {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
     draw_rect(wx.saturating_sub(2), wy.saturating_sub(2), w + 4, h + 4, DARK_BG);
-    blend_rect(wx.saturating_sub(2), wy.saturating_sub(2), w + 4, h + 4, SOVEREIGN_PURPLE, 28);
 }
 
 pub fn clear_window() {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
     draw_rect(wx.saturating_sub(2), wy.saturating_sub(2), WIN_W + 10, WIN_H + 4, DARK_BG);
-    blend_rect(wx.saturating_sub(2), wy.saturating_sub(2), WIN_W + 10, WIN_H + 4, SOVEREIGN_PURPLE, 28);
 }
