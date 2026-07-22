@@ -170,6 +170,43 @@ pub fn draw_hex32(x: u32, y: u32, val: u32, color: u32) {
     draw_bytes(x, y, &buf, color);
 }
 
+pub fn draw_char_15x(x: u32, y: u32, c: char, color: u32) {
+    let idx = if (c as usize) < 128 { c as usize } else { 0x3F };
+    let glyph = FONT_8X8[idx];
+    let mut row = 0u32;
+    while row < 8 {
+        let bits = glyph[row as usize];
+        let mut col = 0u32;
+        while col < 8 {
+            if (bits >> col) & 1 == 1 {
+                let px = x + col * 3 / 2;
+                let py = y + row * 2;
+                draw_rect(px, py, 1, 2, color);
+            }
+            col += 1;
+        }
+        row += 1;
+    }
+}
+
+pub fn draw_str_15x(x: u32, y: u32, s: &str, color: u32) {
+    let mut cx = x;
+    for c in s.chars() {
+        if cx + 13 > 1280 { break; }
+        draw_char_15x(cx, y, c, color);
+        cx += 13;
+    }
+}
+
+pub fn draw_str_15x_clipped(x: u32, y: u32, s: &str, color: u32, max_x: u32) {
+    let mut cx = x;
+    for c in s.chars() {
+        if cx + 13 > max_x { break; }
+        draw_char_15x(cx, y, c, color);
+        cx += 13;
+    }
+}
+
 pub fn draw_char_2x(x: u32, y: u32, c: char, color: u32) {
     let idx = if (c as usize) < 128 { c as usize } else { 0x3F };
     let glyph = FONT_8X8[idx];

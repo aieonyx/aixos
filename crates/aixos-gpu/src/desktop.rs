@@ -3,7 +3,7 @@
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_rect, draw_rounded_border};
 use crate::framebuffer::cache_flush;
-use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32};
+use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
 
 const DARK_BG:          u32 = 0x0D0B1F;
 const DARK_BG2:         u32 = 0x1A0E2E;
@@ -155,7 +155,7 @@ pub fn render_top_bar_icons() {
     draw_rect(12, 13, 14, 2, TEXT_WHITE);
     draw_rect(12, 18, 10, 2, TEXT_WHITE);
     draw_rect(12, 23, 12, 2, TEXT_WHITE);
-    draw_str(34, 15, "aiXos Phoenix", TEXT_WHITE);
+    draw_str_15x(34, 10, "aiXos Phoenix", TEXT_WHITE);
     draw_rounded_rect(380, 8, 240, 22, 8, 0x14122A);
     draw_rounded_border(380, 8, 240, 22, 8, 0x2A2848);
     draw_str(406, 19, "Ask IAM anything...", 0x33334A);
@@ -309,7 +309,7 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_hline(tx.saturating_sub(2), ty + 2,               5, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
-    draw_str(wx + 24, wy + 8, title, TEXT_WHITE);
+    draw_str_15x_clipped(wx + 24, wy + 4, title, TEXT_WHITE, wx + w - 24);
     let cx = wx + w - 18;
     let cy = wy + 7;
     draw_rect(cx, cy, 10, 10, CLOSE_RED);
