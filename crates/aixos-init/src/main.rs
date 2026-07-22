@@ -369,21 +369,38 @@ fn render_all_windows() {
 
 fn handle_dock_click(x: i32, y: i32) {
     if let Some(icon) = aixos_gpu::desktop::dock_icon_at(x, y) {
+        // Dock index -> window kind
+        // 0=O(Onyxia) 1=W(Browser) 2=>_(Shell) 3=F(Files/EDB) 4=D(EDB Browser) 5=I(IAM/Set) 6=S(Settings)
         let kind: u8 = match icon {
+            0 => 0, // Onyxia -> Node window (placeholder)
+            1 => 0, // Browser -> Node window (placeholder)
             2 => 1, // Shell
-            4 => 2, // EDB store
+            3 => 2, // Files -> EDB store (closest match)
+            4 => 4, // EDB Browser
+            5 => 3, // IAM -> Settings (placeholder)
             6 => 3, // Settings
             _ => return,
         };
         unsafe {
             WINDOW_FOCUSED = false;
             if let Some(i) = find_kind(kind) {
+                // Already open — bring to front
                 ACTIVE_WIN = i;
             } else {
-                let slot = find_free().unwrap_or(0);
-                wins()[slot].open = true;
-                wins()[slot].kind = kind;
-                ACTIVE_WIN = slot;
+                // Open in a free slot
+                if let Some(slot) = find_free() {
+                    wins()[slot].open = true;
+                    wins()[slot].kind = kind;
+                    ACTIVE_WIN = slot;
+                }
+                // If no free slot, do nothing (all 5 windows open)
+            }
+            if kind == 1 { WINDOW_FOCUSED = true; }
+            if kind == 4 {
+                EDB_CURSOR = 0;
+                EDB_SCROLL = 0;
+                EDB_FOCUSED = false;
+                EDB_INPUT.clear();
             }
         }
         render_all_windows();
@@ -626,9 +643,14 @@ fn shell_loop(
                 }
                 aixos_gpu::draw_cursor(mouse_state.x, mouse_state.y);
                 if mouse_state.left && !prev_left {
-                    if mouse_state.y < 50 {
+                    if mouse_state.y < 38 {
+                        // Top bar click — hamburger, IAM pill etc (future)
+                        let _ = (mouse_state.x, mouse_state.y);
+                    } else if mouse_state.y >= 676 {
+                        // Dock click
                         handle_dock_click(mouse_state.x, mouse_state.y);
                     } else {
+                        // Canvas + window click
                         handle_click(mouse_state.x, mouse_state.y);
                     }
                 }
