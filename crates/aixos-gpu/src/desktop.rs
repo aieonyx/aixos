@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect};
+use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_rect, draw_rounded_border};
 use crate::framebuffer::cache_flush;
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32};
 
@@ -80,8 +80,8 @@ pub fn render_desktop() {
         draw_rect(*sx, *sy, 2, 2, 0xCCCCDD);
     }
     // Left glass panel
-    draw_rect(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_PANEL);
-    draw_border(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_BORDER);
+    draw_rounded_rect(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
+    draw_rounded_border(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
     draw_hline(9, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
     draw_str(24, TOP_BAR_H + 28, "IDENTITY", 0x44446A);
     draw_rect(20, TOP_BAR_H + 42, 32, 32, SOVEREIGN_PURPLE);
@@ -111,8 +111,8 @@ pub fn render_desktop() {
     draw_str(38, TOP_BAR_H + 288, "ARPi verified", 0x888899);
     // Right glass panel
     let rx: u32 = 1280 - PANEL_W - 8;
-    draw_rect(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_PANEL);
-    draw_border(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, GLASS_BORDER);
+    draw_rounded_rect(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
+    draw_rounded_border(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
     draw_hline(rx + 1, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
     draw_str(rx + 16, TOP_BAR_H + 28, "SYSTEM", 0x44446A);
     let icon_labels: [&str; 6] = ["O","F","S","A","D","N"];
@@ -123,10 +123,10 @@ pub fn render_desktop() {
         let row = ii / 3;
         let ix = rx + 16 + col * 44;
         let iy = TOP_BAR_H + 42 + row * 44;
-        draw_rect(ix, iy, 36, 36, icon_colors[ii as usize]);
+        draw_rounded_rect(ix, iy, 36, 36, 6, icon_colors[ii as usize]);
         blend_rect(ix, iy, 36, 36, 0x000000, 160);
         blend_rect(ix, iy, 36, 18, 0xFFFFFF, 15);
-        draw_border(ix, iy, 36, 36, 0x44446A);
+        draw_rounded_border(ix, iy, 36, 36, 6, 0x44446A);
         draw_str(ix + 12, iy + 22, icon_labels[ii as usize], TEXT_WHITE);
         ii += 1;
     }
@@ -156,8 +156,8 @@ pub fn render_top_bar_icons() {
     draw_rect(12, 18, 10, 2, TEXT_WHITE);
     draw_rect(12, 23, 12, 2, TEXT_WHITE);
     draw_str(34, 15, "aiXos Phoenix", TEXT_WHITE);
-    draw_rect(380, 8, 240, 22, 0x14122A);
-    draw_border(380, 8, 240, 22, 0x2A2848);
+    draw_rounded_rect(380, 8, 240, 22, 8, 0x14122A);
+    draw_rounded_border(380, 8, 240, 22, 8, 0x2A2848);
     draw_str(406, 19, "Ask IAM anything...", 0x33334A);
     draw_str(1200, 19, "19:24", 0x888899);
     draw_rect(1192, 15, 6, 6, ACCENT_TEAL);
@@ -172,9 +172,9 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
     let dock_w: u32 = 420;
     let dock_x: u32 = (1280 - dock_w) / 2;
     let dock_py: u32 = DOCK_Y + 4;
-    draw_rect(dock_x, dock_py, dock_w, 36, 0x100E20);
-    draw_border(dock_x, dock_py, dock_w, 36, 0x2A2848);
-    draw_hline(dock_x + 1, dock_py + 1, dock_w - 2, 0x3A3858);
+    draw_rounded_rect(dock_x, dock_py, dock_w, 36, 10, 0x100E20);
+    draw_rounded_border(dock_x, dock_py, dock_w, 36, 10, 0x2A2848);
+    draw_hline(dock_x + 10, dock_py + 1, dock_w - 20, 0x3A3858);
     // 7 app icons, 34x26 each, 6px gap, start at dock_x+10
     let labels: [&str; 7] = ["O", "W", ">_", "F", "D", "I", "S"];
     let colors: [u32; 7] = [
@@ -187,10 +187,10 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
     while di < 7 {
         let ix = dock_x + 10 + di * (icon_w + icon_gap);
         let iy = dock_py + 5;
-        draw_rect(ix, iy, icon_w, 26, colors[di as usize]);
+        draw_rounded_rect(ix, iy, icon_w, 26, 4, colors[di as usize]);
         blend_rect(ix, iy, icon_w, 26, 0x000000, 120);
         blend_rect(ix, iy, icon_w, 13, 0xFFFFFF, 20);
-        draw_border(ix, iy, icon_w, 26, 0x33334A);
+        draw_rounded_border(ix, iy, icon_w, 26, 4, 0x33334A);
         draw_str(ix + 9, iy + 17, labels[di as usize], TEXT_WHITE);
         di += 1;
     }
@@ -288,9 +288,9 @@ pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
 pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
-    blend_rect(wx + 3, wy + 3, w + 2, h + 2, SHADOW, 120);
-    draw_border(wx.saturating_sub(1), wy.saturating_sub(1), w + 2, h + 2, ACCENT_TEAL);
-    draw_border(wx, wy, w, h, 0x2A1A4A);
+    blend_rect(wx + 3, wy + 3, w + 2, h + 2, SHADOW, 100);
+    draw_rounded_border(wx.saturating_sub(1), wy.saturating_sub(1), w + 2, h + 2, 6, ACCENT_TEAL);
+    draw_rounded_border(wx, wy, w, h, 5, 0x2A1A4A);
     let band = WIN_TITLE_H / 4;
     draw_rect(wx, wy,            w, band,                   GLASS_HI);
     draw_rect(wx, wy + band,     w, band,                   GLASS_MID);

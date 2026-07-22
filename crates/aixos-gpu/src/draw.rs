@@ -24,6 +24,38 @@ pub fn draw_border(x: u32, y: u32, w: u32, h: u32, color: u32) {
     draw_vline(x + w.saturating_sub(1), y, h, color);
 }
 
+pub fn draw_rounded_rect(x: u32, y: u32, w: u32, h: u32, r: u32, color: u32) {
+    if w == 0 || h == 0 { return; }
+    let r = r.min(w / 2).min(h / 2);
+    if h > r * 2 { draw_rect(x, y + r, w, h - r * 2, color); }
+    let mut i = 0u32;
+    while i < r {
+        let inset = r - i;
+        let row_w = w.saturating_sub(inset * 2);
+        if row_w > 0 {
+            draw_hline(x + inset, y + i, row_w, color);
+            draw_hline(x + inset, y + h.saturating_sub(1 + i), row_w, color);
+        }
+        i += 1;
+    }
+}
+
+pub fn draw_rounded_border(x: u32, y: u32, w: u32, h: u32, r: u32, color: u32) {
+    if w == 0 || h == 0 { return; }
+    let r = r.min(w / 2).min(h / 2);
+    if h > r * 2 {
+        draw_vline(x, y + r, h - r * 2, color);
+        draw_vline(x + w.saturating_sub(1), y + r, h - r * 2, color);
+    }
+    let mut i = 0u32;
+    while i < r {
+        let inset = r - i;
+        draw_hline(x + inset, y + i, w.saturating_sub(inset * 2), color);
+        draw_hline(x + inset, y + h.saturating_sub(1 + i), w.saturating_sub(inset * 2), color);
+        i += 1;
+    }
+}
+
 pub fn blend_rect(x: u32, y: u32, w: u32, h: u32, fg: u32, alpha: u8) {
     let fx = x as usize;
     let fy = y as usize;
