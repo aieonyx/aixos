@@ -130,12 +130,13 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 
 #[derive(Clone, Copy)]
 struct WinSlot { open: bool, kind: u8, x: i32, y: i32, w: u32, h: u32 }
-static mut WINS: [WinSlot; 5] = [
+static mut WINS: [WinSlot; 6] = [
     WinSlot { open: false, kind: 0, x: 60,  y: 80,  w: 580, h: 300 },
     WinSlot { open: false, kind: 0, x: 100, y: 100, w: 580, h: 300 },
     WinSlot { open: false, kind: 0, x: 140, y: 120, w: 580, h: 300 },
     WinSlot { open: false, kind: 0, x: 180, y: 140, w: 580, h: 300 },
     WinSlot { open: false, kind: 0, x: 220, y: 160, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 260, y: 180, w: 580, h: 300 },
 ];
 static mut ACTIVE_WIN: usize = 0;
 static mut DRAG_WIN: usize = 0;
@@ -262,7 +263,7 @@ pub extern "C" fn aixos_main() -> ! {
     shell_loop(mouse, mouse_state);
 }
 
-fn wins() -> &'static mut [WinSlot; 5] {
+fn wins() -> &'static mut [WinSlot; 6] {
     unsafe { &mut *core::ptr::addr_of_mut!(WINS) }
 }
 
@@ -350,6 +351,15 @@ fn render_window_for_slot(i: usize) {
                 );
             }
         }
+        5 => aixos_gpu::desktop::render_window(
+            "Network - aiXos Phoenix",
+            &["AWP:    stub  loopback only",
+              "Peers:  0  (no live AWP path yet)",
+              "Node:   40100001  aarch64",
+              "Stack:  virtio-net (not wired)",
+              "Proto:  AWP v0.1  sovereign mesh",
+              "Status: isolated  local only"],
+            w.w, w.h),
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
@@ -377,7 +387,7 @@ fn render_windows_only() {
     unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
-    while i < 5 {
+    while i < 6 {
         if i != active { render_window_for_slot(i); }
         i += 1;
     }
@@ -388,6 +398,7 @@ fn render_windows_only() {
         (wins()[2].open, wins()[2].kind),
         (wins()[3].open, wins()[3].kind),
         (wins()[4].open, wins()[4].kind),
+        (wins()[5].open, wins()[5].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
@@ -411,7 +422,7 @@ fn render_all_windows() {
     unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
-    while i < 5 {
+    while i < 6 {
         if i != active {
             render_window_for_slot(i);
         }
@@ -424,6 +435,7 @@ fn render_all_windows() {
         (wins()[2].open, wins()[2].kind),
         (wins()[3].open, wins()[3].kind),
         (wins()[4].open, wins()[4].kind),
+        (wins()[5].open, wins()[5].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
 }
@@ -605,9 +617,9 @@ fn handle_window_key(code: u16, ch: Option<char>) {
 
 fn handle_click(x: i32, y: i32) {
     unsafe {
-        let order = [ACTIVE_WIN, 4, 3, 2, 1, 0];
+        let order = [ACTIVE_WIN, 5, 4, 3, 2, 1, 0];
         let mut k = 0;
-        while k < 6 {
+        while k < 7 {
             let i = order[k];
             k += 1;
             if k > 1 && i == order[0] { continue; }
@@ -628,7 +640,7 @@ fn handle_click(x: i32, y: i32) {
                     WINDOW_FOCUSED = false;
                     aixos_gpu::desktop::set_window_pos(w.x, w.y);
                     aixos_gpu::desktop::clear_window();
-                    let mut j = 5;
+                    let mut j = 6;
                     while j > 0 { j -= 1; if wins()[j].open { ACTIVE_WIN = j; break; } }
                     render_all_windows();
                     return;
@@ -673,6 +685,7 @@ fn handle_click(x: i32, y: i32) {
                     2 => 3, // S -> Settings
                     3 => 3, // A -> Settings placeholder
                     4 => 4, // D -> EDB Browser
+                    5 => 5, // N -> Network
                     _ => -1,
                 };
                 if kind >= 0 {
