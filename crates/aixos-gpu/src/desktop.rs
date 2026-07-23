@@ -117,14 +117,14 @@ pub fn render_desktop(state: &DesktopState) {
     draw_hline(16, TOP_BAR_H + 218, PANEL_W - 16, GLASS_BORDER);
     draw_str(24, TOP_BAR_H + 234, "BASTION STATUS", 0x44446A);
     let pol_col = if state.edb_live { ACCENT_TEAL } else { 0x444444 };
-    draw_rect(24, TOP_BAR_H + 248, 8, 8, pol_col);
-    draw_str(38, TOP_BAR_H + 256, "Policy active", 0x888899);
+    draw_rect(24, TOP_BAR_H + 256, 8, 8, pol_col);
+    draw_str(36, TOP_BAR_H + 256, "Policy active", 0x888899);
     let desk_col = if state.desktop_ok { ACCENT_TEAL } else { 0x444444 };
-    draw_rect(24, TOP_BAR_H + 264, 8, 8, desk_col);
-    draw_str(38, TOP_BAR_H + 272, "Desktop ready", 0x888899);
+    draw_rect(24, TOP_BAR_H + 272, 8, 8, desk_col);
+    draw_str(36, TOP_BAR_H + 272, "Desktop ready", 0x888899);
     let proof_col = if state.proof == 0x4153 { SOVEREIGN_PURPLE } else { 0x444444 };
-    draw_rect(24, TOP_BAR_H + 280, 8, 8, proof_col);
-    draw_str(38, TOP_BAR_H + 288, "Proof 0x4153", 0x888899);
+    draw_rect(24, TOP_BAR_H + 288, 8, 8, proof_col);
+    draw_str(36, TOP_BAR_H + 288, "Proof 0x4153", 0x888899);
     // Right glass panel
     let rx: u32 = 1280 - PANEL_W - 8;
     draw_rounded_rect(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
@@ -149,22 +149,25 @@ pub fn render_desktop(state: &DesktopState) {
     draw_hline(rx + 8, TOP_BAR_H + 138, PANEL_W - 16, GLASS_BORDER);
     draw_str(rx + 16, TOP_BAR_H + 156, "RESOURCES", 0x44446A);
     let edb_pct = if state.entry_count > 0 { (state.entry_count * 100 / 32) as u32 } else { 0 };
-    draw_str(rx + 16, TOP_BAR_H + 174, "EDB", 0x888899);
-    draw_rect(rx + 16, TOP_BAR_H + 180, PANEL_W - 32, 4, 0x22224A);
-    draw_rect(rx + 16, TOP_BAR_H + 180, (PANEL_W - 32) * edb_pct / 100, 4, SOVEREIGN_PURPLE);
-    draw_hex32(rx + PANEL_W - 48, TOP_BAR_H + 184, edb_pct, 0x44446A);
-    let proof_pct: u32 = if state.proof == 0x4153 { 100 } else { 0 };
-    draw_str(rx + 16, TOP_BAR_H + 196, "SIG", 0x888899);
-    draw_rect(rx + 16, TOP_BAR_H + 202, PANEL_W - 32, 4, 0x22224A);
-    draw_rect(rx + 16, TOP_BAR_H + 202, (PANEL_W - 32) * proof_pct / 100, 4, ACCENT_TEAL);
-    draw_str(rx + PANEL_W - 40, TOP_BAR_H + 206, if state.proof == 0x4153 { "OK" } else { "--" }, 0x44446A);
+    let bar_w: u32 = PANEL_W - 32;
+    let bar_x: u32 = rx + 16;
+    // EDB label then bar below
+    draw_str(rx + 16, TOP_BAR_H + 172, "EDB fill", 0x888899);
+    draw_rect(bar_x, TOP_BAR_H + 182, bar_w, 5, 0x22224A);
+    draw_rect(bar_x, TOP_BAR_H + 182, bar_w * edb_pct / 100, 5, SOVEREIGN_PURPLE);
+    // SIG label then bar below
+    let proof_ok = state.proof == 0x4153;
+    draw_str(rx + 16, TOP_BAR_H + 196, "SIG verify", 0x888899);
+    draw_rect(bar_x, TOP_BAR_H + 206, bar_w, 5, 0x22224A);
+    draw_rect(bar_x, TOP_BAR_H + 206, if proof_ok { bar_w } else { 0 }, 5, ACCENT_TEAL);
+    // OK status shown by full bar color — no separate label needed
     draw_hline(rx + 8, TOP_BAR_H + 220, PANEL_W - 16, GLASS_BORDER);
     draw_str(rx + 16, TOP_BAR_H + 238, "NETWORK", 0x44446A);
     let awp_col = if state.edb_live { ACCENT_TEAL } else { 0x444444 };
     draw_rect(rx + 16, TOP_BAR_H + 252, 8, 8, awp_col);
-    draw_str(rx + 30, TOP_BAR_H + 260, "AWP stub  loopback", 0x888899);
-    draw_str(rx + 16, TOP_BAR_H + 276, "EDB entries:", 0x33334A);
-    draw_hex32(rx + 100, TOP_BAR_H + 276, state.entry_count as u32, 0x44446A);
+    draw_str(rx + 30, TOP_BAR_H + 260, "AWP  loopback", 0x888899);
+    draw_str(rx + 16, TOP_BAR_H + 276, "EDB:", 0x33334A);
+    draw_hex32(rx + 48, TOP_BAR_H + 276, state.entry_count as u32, 0x44446A);
 }
 
 
