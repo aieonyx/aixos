@@ -102,6 +102,31 @@ pub fn render_desktop(state: &DesktopState) {
     for (sx, sy) in stars.iter() {
         draw_rect(*sx, *sy, 2, 2, 0xCCCCDD);
     }
+    // ── Center canvas sovereign anchor (PL-47) ──────────────────────────────
+    // Small diamond at canvas center (between left panel x=188 and right panel x=1092)
+    // Center: x=640, y=390 — subtle, dim, sovereign presence
+    let cx: u32 = 640;
+    let cy: u32 = 390;
+    let r: u32 = 20; // radius
+    let mut di: u32 = 0;
+    while di <= r {
+        let dw = di * 2 + 1;
+        let dx = cx.saturating_sub(di);
+        let dy = cy.saturating_sub(r).saturating_add(di);
+        draw_hline(dx, dy, dw, 0x2A1A4A);
+        di += 1;
+    }
+    let mut di: u32 = 1;
+    while di <= r {
+        let dw = (r - di) * 2 + 1;
+        let dx = cx.saturating_sub(r - di);
+        let dy = cy + di;
+        draw_hline(dx, dy, dw, 0x2A1A4A);
+        di += 1;
+    }
+    // AIEONYX wordmark below diamond — very dim, ambient
+    draw_str(612, cy + r + 8, "AIEONYX", 0x1A1A2A);
+
     // Left glass panel
     draw_rounded_rect(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
     draw_rounded_border(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
