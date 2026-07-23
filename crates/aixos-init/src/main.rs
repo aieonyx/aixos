@@ -83,9 +83,7 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
         }
         // PL-50: cat <filename> — print file contents
         cmd if cmd.starts_with(b"cat ") && cmd.len() > 4 => {
-            // trim at first space so 'cat foo.txt extra' still works
-            let raw = &cmd[4..];
-            let name = if let Some(sp) = raw.iter().position(|&b| b == b' ') { &raw[..sp] } else { raw };
+            let name = &cmd[4..];
             unsafe {
                 if let Some(idx) = aixos_axfs::find(name) {
                     if let Some(f) = aixos_axfs::file_at(idx) {
@@ -168,7 +166,9 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                     j += 1;
                 }
                 aixos_edisondb::write("user:name", hash, aixos_edisondb::Tier::Personal);
-                "name: identity stored in EdisonDB"
+                // PL-51: also persist name bytes to AXFS for boot restore
+                aixos_axfs::write(b"sys:name", &USER_NAME_BUF[..len]);
+                "name: identity stored"
             }
         }
         b"db" => {
@@ -285,6 +285,11 @@ static mut EDB_CURSOR: usize = 0;
 static mut EDB_SCROLL: usize = 0;
 static mut EDB_INPUT: ShellBuf = ShellBuf::new();
 static mut EDB_FOCUSED: bool = false;
+static mut FILES_CURSOR: usize = 0;
+static mut FILES_VIEWING: bool = false;
+static mut FILES_VIEW_IDX: usize = 0;
+static mut FILES_CONTENT_BUF: [u8; 256] = [0u8; 256];
+static mut FILES_CONTENT_LEN: usize = 0;
 static mut EDB_ENTRY_COUNT: usize = 0;
 static mut EDB_ENTRIES: [(&'static str, &'static str, u64); 32] = [("", "", 0u64); 32];
 // PL-48: cursor position statics — redrawn at end of every render pass
@@ -322,6 +327,26 @@ pub extern "C" fn aixos_main() -> ! {
     aixos_edisondb::init();
     // PL-50: AXFS init — seeds readme.txt
     aixos_axfs::init();
+    // PL-51: restore persisted identity from EdisonDB + AXFS on boot
+    unsafe {
+        // Restore tz offset
+        if let Some(raw) = aixos_edisondb::read("user:tz") {
+            TZ_OFFSET = raw as i32;
+            uart_write("boot: tz restored\n");
+        }
+        // Restore user name from AXFS sys:name file
+        if let Some(idx) = aixos_axfs::find(b"sys:name") {
+            if let Some(f) = aixos_axfs::file_at(idx) {
+                let data = f.data_bytes();
+                let len = data.len().min(31);
+                USER_NAME_LEN = len;
+                let mut i = 0;
+                while i < len { USER_NAME_BUF[i] = data[i]; i += 1; }
+                USER_NAME_BUF[len] = 0;
+                uart_write("boot: name restored\n");
+            }
+        }
+    }
     aixos_edisondb::write("boot:node_id", aixos_identity::node_id(), aixos_edisondb::Tier::Critical);
     aixos_edisondb::log_event("boot:desktop_ready");
     if aixos_edisondb::is_live() {
@@ -494,6 +519,37 @@ fn render_window_for_slot(i: usize) {
               "Proto:  AWP v0.1  sovereign mesh",
               "Status: isolated  local only"],
             w.w, w.h),
+        6 => {
+            unsafe {
+                let count = aixos_axfs::count();
+                static mut FILE_NAME_PTRS: [(*const u8, usize); 8] = [(core::ptr::null(), 0); 8];
+                let n = count.min(8);
+                let mut fi = 0;
+                while fi < n {
+                    if let Some(f) = aixos_axfs::file_at(fi) {
+                        let nb = f.name_bytes();
+                        FILE_NAME_PTRS[fi] = (nb.as_ptr(), nb.len());
+                    }
+                    fi += 1;
+                }
+                let content = if FILES_VIEWING {
+                    &FILES_CONTENT_BUF[..FILES_CONTENT_LEN]
+                } else {
+                    &[][..]
+                };
+                aixos_gpu::desktop::set_window_pos(w.x, w.y);
+                aixos_gpu::desktop::render_window("AXFS - Files", &[], w.w, w.h);
+                aixos_gpu::desktop::render_files_window(
+                    w.x, w.y, w.w, w.h,
+                    &FILE_NAME_PTRS[..n],
+                    count,
+                    FILES_CURSOR,
+                    content,
+                    FILES_CONTENT_LEN,
+                    FILES_VIEWING,
+                );
+            }
+        }
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
@@ -587,6 +643,52 @@ fn render_all_windows() {
 }
 
 
+fn handle_files_key(code: u16) {
+    unsafe {
+        let count = aixos_axfs::count();
+        if FILES_VIEWING {
+            if code == 1 {
+                FILES_VIEWING = false;
+                render_all_windows();
+            }
+        } else {
+            match code {
+                103 => {
+                    if FILES_CURSOR > 0 { FILES_CURSOR -= 1; }
+                    render_all_windows();
+                }
+                108 => {
+                    if count > 0 && FILES_CURSOR + 1 < count { FILES_CURSOR += 1; }
+                    render_all_windows();
+                }
+                28 => {
+                    if FILES_CURSOR < count {
+                        if let Some(f) = aixos_axfs::file_at(FILES_CURSOR) {
+                            let data = f.data_bytes();
+                            let len = data.len().min(256);
+                            FILES_CONTENT_LEN = len;
+                            let mut i = 0;
+                            while i < len { FILES_CONTENT_BUF[i] = data[i]; i += 1; }
+                            FILES_VIEW_IDX = FILES_CURSOR;
+                            FILES_VIEWING = true;
+                            render_all_windows();
+                        }
+                    }
+                }
+                1 => {
+                    if let Some(i) = find_kind(6) {
+                        wins()[i].open = false;
+                        FILES_CURSOR = 0;
+                        FILES_VIEWING = false;
+                    }
+                    render_all_windows();
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 fn handle_dock_click(x: i32, y: i32) {
     if let Some(icon) = aixos_gpu::desktop::dock_icon_at(x, y) {
         // Dock index -> window kind
@@ -595,7 +697,7 @@ fn handle_dock_click(x: i32, y: i32) {
             0 => 0, // Onyxia -> Node window (placeholder)
             1 => 0, // Browser -> Node window (placeholder)
             2 => 1, // Shell
-            3 => 2, // Files -> EDB store (closest match)
+            3 => 6, // Files -> AXFS Files window (PL-52)
             4 => 4, // EDB Browser
             5 => 3, // IAM -> Settings (placeholder)
             6 => 3, // Settings
@@ -615,7 +717,7 @@ fn handle_dock_click(x: i32, y: i32) {
                 }
                 // If no free slot, do nothing (all 5 windows open)
             }
-            if kind == 1 { WINDOW_FOCUSED = true; }
+            if kind == 1 || kind == 6 { WINDOW_FOCUSED = true; }
             if kind == 4 {
                 EDB_CURSOR = 0;
                 EDB_SCROLL = 0;
@@ -724,6 +826,10 @@ fn handle_edb_key(code: u16, ch: Option<char>) {
 
 fn handle_window_key(code: u16, ch: Option<char>) {
     unsafe {
+        if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 6 {
+            handle_files_key(code);
+            return;
+        }
         if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 4 {
             handle_edb_key(code, ch);
             return;
@@ -985,7 +1091,7 @@ fn shell_loop(
 fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
     unsafe {
 
-        if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
+        if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && (wins()[ACTIVE_WIN].kind == 1 || wins()[ACTIVE_WIN].kind == 6) {
             handle_window_key(code, ch);
             return;
         }

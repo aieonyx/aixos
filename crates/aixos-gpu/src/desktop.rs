@@ -399,7 +399,6 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
     blend_rect(wx + 3, wy + 3, w + 2, h + 2, SHADOW, 100);
-    draw_rounded_border(wx.saturating_sub(1), wy.saturating_sub(1), w + 2, h + 2, 6, ACCENT_TEAL);
     draw_rounded_border(wx, wy, w, h, 5, 0x2A1A4A);
     let band = WIN_TITLE_H / 4;
     draw_rect(wx, wy,            w, band,                   GLASS_HI);
@@ -428,6 +427,7 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_str(cx + 2, cy + 1, "x", TEXT_WHITE);
     draw_hline(wx, wy + WIN_TITLE_H, w, ACCENT_TEAL);
     draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
+
     blend_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, SOVEREIGN_PURPLE, 12);
     let mut row = 0u32;
     let max_rows = if h > WIN_TITLE_H + 20 { (h - WIN_TITLE_H - 20) / 18 } else { 0 };
@@ -481,6 +481,70 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
     }
 }
 
+
+// ── PL-52: AXFS Files Window ─────────────────────────────────────────────────
+
+pub fn render_files_window(
+    wx: i32, wy: i32, w: u32, h: u32,
+    file_names: &[(*const u8, usize)],
+    file_count: usize,
+    cursor: usize,
+    content: &[u8],
+    content_len: usize,
+    viewing: bool,
+) {
+    let wx_u = wx as u32;
+    let wy_u = wy as u32;
+    // Content area starts below title bar (render_window already drew chrome)
+    let start_y = wy_u + WIN_TITLE_H + 2;
+    let row_h: u32 = 16;
+    let max_rows = (h.saturating_sub(WIN_TITLE_H + 20)) / row_h;
+
+    if viewing {
+        // Draw "< back" hint in title area
+        draw_str(wx_u + w - 100, wy_u + 14, "Esc=back", 0x44446A);
+        // Render content line by line
+        let mut line_start = 0usize;
+        let mut row = 0u32;
+        let mut i = 0;
+        while i <= content_len && row < max_rows {
+            if i == content_len || content[i] == b'\n' {
+                let line = &content[line_start..i];
+                if let Ok(s) = core::str::from_utf8(line) {
+                    draw_str_clipped(wx_u + 8, start_y + row * row_h + 4, s, TEXT_WHITE, wx_u + w - 8);
+                }
+                row += 1;
+                line_start = i + 1;
+            }
+            i += 1;
+        }
+        draw_str(wx_u + 8, wy_u + h - 12, "Esc: back to list", 0x44446A);
+    } else {
+        // Hint in title area
+        // hints shown at bottom only
+        // Render file list
+        let mut fi = 0usize;
+        while fi < file_count && (fi as u32) < max_rows {
+            let (ptr, len) = file_names[fi];
+            let row_y = start_y + fi as u32 * row_h;
+            let is_sel = fi == cursor;
+            if is_sel {
+                draw_rect(wx_u + 2, row_y, w - 4, row_h, SOVEREIGN_PURPLE);
+            }
+            let col = if is_sel { TEXT_WHITE } else { 0x888899 };
+            draw_str(wx_u + 8, row_y + 4, if is_sel { ">" } else { " " }, ACCENT_TEAL);
+            let name_bytes = unsafe { core::slice::from_raw_parts(ptr, len) };
+            if let Ok(s) = core::str::from_utf8(name_bytes) {
+                draw_str_clipped(wx_u + 20, row_y + 4, s, col, wx_u + w - 8);
+            }
+            fi += 1;
+        }
+        if file_count == 0 {
+            draw_str(wx_u + 8, start_y + 4, "[empty filesystem]", 0x44446A);
+        }
+        draw_str(wx_u + 8, wy_u + h - 12, "arrows: navigate  Enter: open  Esc: close", 0x44446A);
+    }
+}
 
 // ── PL-32: EDB Browser Window ────────────────────────────────────────────────
 
