@@ -37,7 +37,7 @@ impl ShellBuf {
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
     match cmd {
-        b"help" => "help clear version db window settings browse close reboot",
+        b"help" => "help clear version db window settings browse close reboot tz name ls cat write",
         b"clear" => "axos> ",
         b"version" => "aiXos Phoenix v0.1.0 — Sovereign Stack",
         b"sovereignty" =>
@@ -48,6 +48,126 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
         b"reboot" => {
             uart_write("axos> reboot\n");
             loop {}
+        }
+        // PL-50: ls — list AXFS files
+        b"ls" => {
+            unsafe {
+                let count = aixos_axfs::count();
+                AXFS_BUF_LEN = 0;
+                if count == 0 {
+                    let msg = b"[empty filesystem]";
+                    let mut i = 0;
+                    while i < msg.len() && AXFS_BUF_LEN < 510 {
+                        AXFS_BUF[AXFS_BUF_LEN] = msg[i];
+                        AXFS_BUF_LEN += 1;
+                        i += 1;
+                    }
+                } else {
+                    let mut fi = 0;
+                    while fi < count {
+                        if let Some(f) = aixos_axfs::file_at(fi) {
+                            let name = f.name_bytes();
+                            let mut ni = 0;
+                            while ni < name.len() && AXFS_BUF_LEN < 508 {
+                                AXFS_BUF[AXFS_BUF_LEN] = name[ni];
+                                AXFS_BUF_LEN += 1;
+                                ni += 1;
+                            }
+                            if AXFS_BUF_LEN < 510 { AXFS_BUF[AXFS_BUF_LEN] = b'\n'; AXFS_BUF_LEN += 1; }
+                        }
+                        fi += 1;
+                    }
+                }
+                core::str::from_utf8_unchecked(&AXFS_BUF[..AXFS_BUF_LEN])
+            }
+        }
+        // PL-50: cat <filename> — print file contents
+        cmd if cmd.starts_with(b"cat ") && cmd.len() > 4 => {
+            let name = &cmd[4..];
+            unsafe {
+                if let Some(idx) = aixos_axfs::find(name) {
+                    if let Some(f) = aixos_axfs::file_at(idx) {
+                        let data = f.data_bytes();
+                        let dlen = data.len().min(510);
+                        AXFS_BUF_LEN = dlen;
+                        let mut i = 0;
+                        while i < dlen { AXFS_BUF[i] = data[i]; i += 1; }
+                        core::str::from_utf8_unchecked(&AXFS_BUF[..AXFS_BUF_LEN])
+                    } else {
+                        "axfs: read error"
+                    }
+                } else {
+                    "axfs: file not found"
+                }
+            }
+        }
+        // PL-50: write <filename> <content> — create/overwrite file
+        cmd if cmd.starts_with(b"write ") && cmd.len() > 6 => {
+            let rest = &cmd[6..];
+            // find space separating filename from content
+            let mut sp = 0;
+            while sp < rest.len() && rest[sp] != b' ' { sp += 1; }
+            if sp >= rest.len() {
+                "usage: write <file> <content>"
+            } else {
+                let name = &rest[..sp];
+                let data = &rest[sp + 1..];
+                if aixos_axfs::write(name, data) {
+                    "axfs: file written"
+                } else {
+                    "axfs: filesystem full (8 files max)"
+                }
+            }
+        }
+        // PL-49: tz command — set UTC offset, stored in EdisonDB
+        // Accepts: tz +2  tz -5  tz 8  tz +0
+        cmd if cmd.starts_with(b"tz") && cmd.len() > 2 && (cmd[2] == b' ' || cmd[2] == b'+' || cmd[2] == b'-') => {
+            // Skip whitespace/sign characters to find sign and numeric value
+            let arg = &cmd[2..]; // starts with space, +, or -
+            // Scan for sign char (skip leading space)
+            let mut idx = 0usize;
+            while idx < arg.len() && arg[idx] == b' ' { idx += 1; }
+            let sign: i32 = if idx < arg.len() && arg[idx] == b'-' {
+                idx += 1; -1
+            } else if idx < arg.len() && arg[idx] == b'+' {
+                idx += 1; 1
+            } else { 1 };
+            let mut val: i32 = 0;
+            while idx < arg.len() {
+                let d = arg[idx];
+                if d >= b'0' && d <= b'9' {
+                    val = val * 10 + (d - b'0') as i32;
+                }
+                idx += 1;
+            }
+            let offset = sign * val.clamp(0, 14);
+            unsafe {
+                TZ_OFFSET = offset;
+                // store as u64 cast (i32 bit pattern)
+                aixos_edisondb::write("user:tz", offset as u64, aixos_edisondb::Tier::Personal);
+                "tz: offset stored in EdisonDB"
+            }
+        }
+        // PL-49: name command — set display name, stored in EdisonDB
+        cmd if cmd.starts_with(b"name ") && cmd.len() > 5 => {
+            let name = &cmd[5..];
+            let len = name.len().min(31);
+            unsafe {
+                USER_NAME_LEN = len;
+                let mut i = 0;
+                while i < len { USER_NAME_BUF[i] = name[i]; i += 1; }
+                USER_NAME_BUF[len] = 0;
+                // store FNV-1a hash of name as EDB value (u64 store)
+                let mut hash: u64 = 14695981039346656037u64;
+                let mut j = 0;
+                while j < len {
+                    hash ^= name[j] as u64;
+                    hash = hash.wrapping_mul(1099511628211u64);
+                    j += 1;
+                }
+                aixos_edisondb::write("user:name", hash, aixos_edisondb::Tier::Personal);
+                "name: identity stored in EdisonDB"
+            }
         }
         b"db" => {
             if aixos_edisondb::is_live() {
@@ -146,6 +266,9 @@ static mut WIN_OUTPUT: [&str; 8] = [""; 8];
 static mut WIN_OUTPUT_LEN: usize = 0;
 static mut ECHO_BUFS: [[u8; 72]; 8] = [[0; 72]; 8];
 static mut ECHO_NEXT: usize = 0;
+// PL-50: AXFS output buffer — single slot, large enough for ls listing
+static mut AXFS_BUF: [u8; 512] = [0u8; 512];
+static mut AXFS_BUF_LEN: usize = 0;
 static mut DRAG_ACTIVE: bool = false;
 static mut DRAG_OFF_X: i32 = 0;
 static mut DRAG_OFF_Y: i32 = 0;
@@ -162,6 +285,13 @@ static mut EDB_INPUT: ShellBuf = ShellBuf::new();
 static mut EDB_FOCUSED: bool = false;
 static mut EDB_ENTRY_COUNT: usize = 0;
 static mut EDB_ENTRIES: [(&'static str, &'static str, u64); 32] = [("", "", 0u64); 32];
+// PL-48: cursor position statics — redrawn at end of every render pass
+static mut CURSOR_X: i32 = 640;
+static mut CURSOR_Y: i32 = 360;
+// PL-49: user identity store — timezone offset and display name
+static mut TZ_OFFSET: i32 = 0;
+static mut USER_NAME_BUF: [u8; 32] = [0u8; 32];
+static mut USER_NAME_LEN: usize = 0;
 
 #[no_mangle]
 pub extern "C" fn aixos_main() -> ! {
@@ -188,6 +318,8 @@ pub extern "C" fn aixos_main() -> ! {
 
     let virtio_ok;
     aixos_edisondb::init();
+    // PL-50: AXFS init — seeds readme.txt
+    aixos_axfs::init();
     aixos_edisondb::write("boot:node_id", aixos_identity::node_id(), aixos_edisondb::Tier::Critical);
     aixos_edisondb::log_event("boot:desktop_ready");
     if aixos_edisondb::is_live() {
@@ -227,7 +359,7 @@ pub extern "C" fn aixos_main() -> ! {
             DESKTOP_STATE.rtc_mon  = rmon;
             aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
         }
-            unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
+            unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset); }
             {
                 let slots = unsafe {[
                     (wins()[0].open, wins()[0].kind),
@@ -382,9 +514,13 @@ fn render_windows_only() {
             DESKTOP_STATE.rtc_min  = rm;
             DESKTOP_STATE.rtc_day  = rd;
             DESKTOP_STATE.rtc_mon  = rmon;
+            // PL-49: user identity in desktop state
+            DESKTOP_STATE.tz_offset = TZ_OFFSET;
+            DESKTOP_STATE.user_name = core::slice::from_raw_parts(
+                USER_NAME_BUF.as_ptr(), USER_NAME_LEN);
             aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
         }
-    unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
+    unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset); }
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 6 {
@@ -401,6 +537,8 @@ fn render_windows_only() {
         (wins()[5].open, wins()[5].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
+    // PL-48: redraw cursor to prevent ghost artifact after panel redraws
+    unsafe { aixos_gpu::draw_cursor(CURSOR_X, CURSOR_Y); }
 }
 
 fn render_all_windows() {
@@ -417,9 +555,13 @@ fn render_all_windows() {
             DESKTOP_STATE.rtc_min  = rm;
             DESKTOP_STATE.rtc_day  = rd;
             DESKTOP_STATE.rtc_mon  = rmon;
+            // PL-49: user identity in desktop state
+            DESKTOP_STATE.tz_offset = TZ_OFFSET;
+            DESKTOP_STATE.user_name = core::slice::from_raw_parts(
+                USER_NAME_BUF.as_ptr(), USER_NAME_LEN);
             aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
         }
-    unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
+    unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset); }
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 6 {
@@ -438,6 +580,8 @@ fn render_all_windows() {
         (wins()[5].open, wins()[5].kind),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
+    // PL-48: redraw cursor to prevent ghost artifact after full clear
+    unsafe { aixos_gpu::draw_cursor(CURSOR_X, CURSOR_Y); }
 }
 
 
@@ -775,6 +919,8 @@ fn shell_loop(
             let old_y = mouse_state.y;
             let prev_left = mouse_state.left;
             if m.poll(&mut mouse_state) {
+                // PL-48: track cursor position for render pass redraws
+                unsafe { CURSOR_X = mouse_state.x; CURSOR_Y = mouse_state.y; }
                 aixos_gpu::erase_cursor(old_x, old_y);
                 unsafe {
                     if RESIZE_ACTIVE && !mouse_state.left {

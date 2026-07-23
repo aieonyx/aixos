@@ -10,6 +10,7 @@ members = [
     "crates/aixos-edisondb",
     "crates/aixos-gpu",
     "crates/aixos-input",
+    "crates/aixos-axfs",
 ]
 
 [workspace.package]

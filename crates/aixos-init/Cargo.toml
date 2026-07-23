@@ -21,3 +21,4 @@ aixos-shell = { path = "../aixos-shell" }
 aixos-edisondb = { path = "../aixos-edisondb" }
 aixos-gpu = { path = "../aixos-gpu" }
 aixos-input = { path = "../aixos-input" }
+aixos-axfs = { path = "../aixos-axfs" }

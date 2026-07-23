@@ -41,6 +41,9 @@ pub struct DesktopState {
     pub rtc_day:     u8,
     pub rtc_mon:     u8,
     pub active_space: u8,
+    // PL-49: user identity fields
+    pub tz_offset:   i32,
+    pub user_name:   &'static [u8],
 }
 impl DesktopState {
     pub const fn default() -> Self {
@@ -48,6 +51,7 @@ impl DesktopState {
             node_id: 0, proof: 0x4153, edb_live: false,
             entry_count: 0, desktop_ok: false, uptime_sec: 0, active_space: 0,
             rtc_hour: 0, rtc_min: 0, rtc_day: 0, rtc_mon: 0,
+            tz_offset: 0, user_name: b"",
         }
     }
 }
@@ -134,9 +138,17 @@ pub fn render_desktop(state: &DesktopState) {
     draw_str(24, TOP_BAR_H + 28, "IDENTITY", 0x44446A);
     draw_rect(20, TOP_BAR_H + 42, 32, 32, SOVEREIGN_PURPLE);
     blend_rect(20, TOP_BAR_H + 42, 32, 32, 0xFFFFFF, 20);
-    draw_str(30, TOP_BAR_H + 63, "E", TEXT_WHITE);
-    draw_hex32(60, TOP_BAR_H + 55, state.node_id as u32, TEXT_WHITE);
-    draw_str(60, TOP_BAR_H + 68, "Sovereign", 0x44446A);
+    // PL-49: show user name if set, else fallback to "E" + hex node_id
+    if !state.user_name.is_empty() {
+        if let Ok(s) = core::str::from_utf8(state.user_name) {
+            draw_str(30, TOP_BAR_H + 63, s, TEXT_WHITE);
+        }
+        draw_str(30, TOP_BAR_H + 73, "Sovereign", 0x44446A);
+    } else {
+        draw_str(30, TOP_BAR_H + 63, "E", TEXT_WHITE);
+        draw_hex32(60, TOP_BAR_H + 55, state.node_id as u32, TEXT_WHITE);
+        draw_str(60, TOP_BAR_H + 68, "Sovereign", 0x44446A);
+    }
     draw_hline(16, TOP_BAR_H + 90, PANEL_W - 16, GLASS_BORDER);
     draw_str(24, TOP_BAR_H + 108, "SPACES", 0x44446A);
     let space_labels: [&str; 4] = ["Desktop", "Files", "Onyxia", "EdisonDB"];
@@ -218,7 +230,7 @@ pub fn render_desktop(state: &DesktopState) {
 }
 
 
-pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day: u8, rtc_mon: u8) {
+pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day: u8, rtc_mon: u8, tz_offset: i32) {
     draw_rect(0, 0, 1280, TOP_BAR_H, 0x08060F);
     draw_hline(0, 0, 1280, 0x2A2848);
     draw_hline(0, TOP_BAR_H - 1, 1280, 0x1A1830);
@@ -239,12 +251,25 @@ pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day:
     crate::font::draw_char(1112, 15, digs[((rtc_day / 10) % 10) as usize] as char, 0x888899);
     crate::font::draw_char(1120, 15, digs[(rtc_day % 10) as usize] as char, 0x888899);
     draw_str(1130, 15, " ", 0x666688);
-    crate::font::draw_char(1138, 15, digs[((rtc_hour / 10) % 10) as usize] as char, 0x888899);
-    crate::font::draw_char(1146, 15, digs[(rtc_hour % 10) as usize] as char, 0x888899);
+    // PL-49: apply timezone offset to clock display
+    let local_hour = ((rtc_hour as i32 + tz_offset).rem_euclid(24)) as u8;
+    crate::font::draw_char(1138, 15, digs[((local_hour / 10) % 10) as usize] as char, 0x888899);
+    crate::font::draw_char(1146, 15, digs[(local_hour % 10) as usize] as char, 0x888899);
     draw_str(1154, 15, ":", 0x666688);
     crate::font::draw_char(1162, 15, digs[((rtc_min / 10) % 10) as usize] as char, 0x888899);
     crate::font::draw_char(1170, 15, digs[(rtc_min % 10) as usize] as char, 0x888899);
-    draw_str(1190, 15, "UTC", 0x444466);
+    // Show UTC+N or UTC-N label
+    if tz_offset == 0 {
+        draw_str(1190, 15, "UTC", 0x444466);
+    } else if tz_offset > 0 {
+        draw_str(1190, 15, "UTC+", 0x4466AA);
+        let tz_abs = tz_offset as u8;
+        crate::font::draw_char(1222, 15, digs[(tz_abs % 10) as usize] as char, 0x4466AA);
+    } else {
+        draw_str(1190, 15, "UTC-", 0x6644AA);
+        let tz_abs = (-tz_offset) as u8;
+        crate::font::draw_char(1222, 15, digs[(tz_abs % 10) as usize] as char, 0x6644AA);
+    }
     draw_rect(1230, 15, 6, 6, ACCENT_TEAL);
 }
 
