@@ -39,11 +39,7 @@ static mut SHIFT_ACTIVE: bool = false;
 pub fn poll() -> Option<KeyEvent> {
     // virtio-input path first — GTK window keyboard
     if virtio_input::is_initialized() {
-        loop {
-            let ev = match virtio_input::poll_event() {
-                Some(e) => e,
-                None => break,
-            };
+        while let Some(ev) = virtio_input::poll_event() {
             if ev.code == KEY_LEFTSHIFT || ev.code == KEY_RIGHTSHIFT {
                 unsafe {
                     SHIFT_ACTIVE = ev.value == EV_VALUE_PRESS || ev.value == EV_VALUE_REPEAT;
