@@ -29,6 +29,19 @@ const CANVAS_H:   u32 = 638;
 const GLASS_PANEL: u32 = 0x0F0D22;
 const GLASS_BORDER: u32 = 0x2A2840;
 
+pub struct DesktopState {
+    pub node_id:     u64,
+    pub proof:       u64,
+    pub edb_live:    bool,
+    pub entry_count: usize,
+    pub desktop_ok:  bool,
+}
+impl DesktopState {
+    pub const fn default() -> Self {
+        DesktopState { node_id: 0, proof: 0x4153, edb_live: false, entry_count: 0, desktop_ok: false }
+    }
+}
+
 
 // ── PL-33: Boot Splash Screen ────────────────────────────────────────────────
 
@@ -61,7 +74,7 @@ pub fn render_splash() {
     draw_rect(392, 502, 496, 8, ACCENT_TEAL);
 }
 
-pub fn render_desktop() {
+pub fn render_desktop(state: &DesktopState) {
     let mut by: u32 = 0;
     while by < 720 {
         let t = (by * 255 / 720) as u8;
@@ -87,7 +100,7 @@ pub fn render_desktop() {
     draw_rect(20, TOP_BAR_H + 42, 32, 32, SOVEREIGN_PURPLE);
     blend_rect(20, TOP_BAR_H + 42, 32, 32, 0xFFFFFF, 20);
     draw_str(30, TOP_BAR_H + 63, "E", TEXT_WHITE);
-    draw_str(60, TOP_BAR_H + 55, "Edison", TEXT_WHITE);
+    draw_hex32(60, TOP_BAR_H + 55, state.node_id as u32, TEXT_WHITE);
     draw_str(60, TOP_BAR_H + 68, "Sovereign", 0x44446A);
     draw_hline(16, TOP_BAR_H + 90, PANEL_W - 16, GLASS_BORDER);
     draw_str(24, TOP_BAR_H + 108, "SPACES", 0x44446A);
@@ -103,12 +116,15 @@ pub fn render_desktop() {
     draw_str(34, TOP_BAR_H + 198, "EdisonDB", 0x55556A);
     draw_hline(16, TOP_BAR_H + 218, PANEL_W - 16, GLASS_BORDER);
     draw_str(24, TOP_BAR_H + 234, "BASTION STATUS", 0x44446A);
-    draw_rect(24, TOP_BAR_H + 248, 8, 8, ACCENT_TEAL);
+    let pol_col = if state.edb_live { ACCENT_TEAL } else { 0x444444 };
+    draw_rect(24, TOP_BAR_H + 248, 8, 8, pol_col);
     draw_str(38, TOP_BAR_H + 256, "Policy active", 0x888899);
-    draw_rect(24, TOP_BAR_H + 264, 8, 8, ACCENT_TEAL);
-    draw_str(38, TOP_BAR_H + 272, "AWP signed", 0x888899);
-    draw_rect(24, TOP_BAR_H + 280, 8, 8, SOVEREIGN_PURPLE);
-    draw_str(38, TOP_BAR_H + 288, "ARPi verified", 0x888899);
+    let desk_col = if state.desktop_ok { ACCENT_TEAL } else { 0x444444 };
+    draw_rect(24, TOP_BAR_H + 264, 8, 8, desk_col);
+    draw_str(38, TOP_BAR_H + 272, "Desktop ready", 0x888899);
+    let proof_col = if state.proof == 0x4153 { SOVEREIGN_PURPLE } else { 0x444444 };
+    draw_rect(24, TOP_BAR_H + 280, 8, 8, proof_col);
+    draw_str(38, TOP_BAR_H + 288, "Proof 0x4153", 0x888899);
     // Right glass panel
     let rx: u32 = 1280 - PANEL_W - 8;
     draw_rounded_rect(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
@@ -132,19 +148,23 @@ pub fn render_desktop() {
     }
     draw_hline(rx + 8, TOP_BAR_H + 138, PANEL_W - 16, GLASS_BORDER);
     draw_str(rx + 16, TOP_BAR_H + 156, "RESOURCES", 0x44446A);
-    draw_str(rx + 16, TOP_BAR_H + 174, "CPU", 0x888899);
+    let edb_pct = if state.entry_count > 0 { (state.entry_count * 100 / 32) as u32 } else { 0 };
+    draw_str(rx + 16, TOP_BAR_H + 174, "EDB", 0x888899);
     draw_rect(rx + 16, TOP_BAR_H + 180, PANEL_W - 32, 4, 0x22224A);
-    draw_rect(rx + 16, TOP_BAR_H + 180, (PANEL_W - 32) * 30 / 100, 4, SOVEREIGN_PURPLE);
-    draw_str(rx + PANEL_W - 40, TOP_BAR_H + 184, "30%", 0x44446A);
-    draw_str(rx + 16, TOP_BAR_H + 196, "MEM", 0x888899);
+    draw_rect(rx + 16, TOP_BAR_H + 180, (PANEL_W - 32) * edb_pct / 100, 4, SOVEREIGN_PURPLE);
+    draw_hex32(rx + PANEL_W - 48, TOP_BAR_H + 184, edb_pct, 0x44446A);
+    let proof_pct: u32 = if state.proof == 0x4153 { 100 } else { 0 };
+    draw_str(rx + 16, TOP_BAR_H + 196, "SIG", 0x888899);
     draw_rect(rx + 16, TOP_BAR_H + 202, PANEL_W - 32, 4, 0x22224A);
-    draw_rect(rx + 16, TOP_BAR_H + 202, (PANEL_W - 32) * 55 / 100, 4, ACCENT_TEAL);
-    draw_str(rx + PANEL_W - 40, TOP_BAR_H + 206, "55%", 0x44446A);
+    draw_rect(rx + 16, TOP_BAR_H + 202, (PANEL_W - 32) * proof_pct / 100, 4, ACCENT_TEAL);
+    draw_str(rx + PANEL_W - 40, TOP_BAR_H + 206, if state.proof == 0x4153 { "OK" } else { "--" }, 0x44446A);
     draw_hline(rx + 8, TOP_BAR_H + 220, PANEL_W - 16, GLASS_BORDER);
     draw_str(rx + 16, TOP_BAR_H + 238, "NETWORK", 0x44446A);
-    draw_rect(rx + 16, TOP_BAR_H + 252, 8, 8, ACCENT_TEAL);
-    draw_str(rx + 30, TOP_BAR_H + 260, "AWP mesh active", 0x888899);
-    draw_str(rx + 16, TOP_BAR_H + 276, "0 peers  local only", 0x33334A);
+    let awp_col = if state.edb_live { ACCENT_TEAL } else { 0x444444 };
+    draw_rect(rx + 16, TOP_BAR_H + 252, 8, 8, awp_col);
+    draw_str(rx + 30, TOP_BAR_H + 260, "AWP stub  loopback", 0x888899);
+    draw_str(rx + 16, TOP_BAR_H + 276, "EDB entries:", 0x33334A);
+    draw_hex32(rx + 100, TOP_BAR_H + 276, state.entry_count as u32, 0x44446A);
 }
 
 

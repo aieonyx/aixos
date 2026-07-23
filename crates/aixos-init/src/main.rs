@@ -150,6 +150,7 @@ static mut DRAG_OFF_X: i32 = 0;
 static mut DRAG_OFF_Y: i32 = 0;
 static mut RESIZE_ACTIVE: bool = false;
 static mut RESIZE_WIN: usize = 0;
+static mut DESKTOP_STATE: aixos_gpu::desktop::DesktopState = aixos_gpu::desktop::DesktopState::default();
 static mut EDB_CURSOR: usize = 0;
 static mut EDB_SCROLL: usize = 0;
 static mut EDB_INPUT: ShellBuf = ShellBuf::new();
@@ -178,6 +179,13 @@ pub extern "C" fn aixos_main() -> ! {
     if aixos_edisondb::is_live() {
         uart_write("EdisonDB: live\n");
     }
+    unsafe {
+        DESKTOP_STATE.node_id     = aixos_identity::node_id();
+        DESKTOP_STATE.proof       = 0x4153;
+        DESKTOP_STATE.edb_live    = aixos_edisondb::is_live();
+        DESKTOP_STATE.entry_count = aixos_edisondb::entry_count();
+        DESKTOP_STATE.desktop_ok  = true;
+    }
 
     match aixos_gpu::init() {
         Some(_) => {
@@ -189,7 +197,7 @@ pub extern "C" fn aixos_main() -> ! {
                 unsafe { core::ptr::read_volatile(&splash_delay); }
                 splash_delay += 1;
             }
-            aixos_gpu::desktop::render_desktop();
+            aixos_gpu::desktop::render_desktop(unsafe { &DESKTOP_STATE });
             aixos_gpu::desktop::render_top_bar_icons();
             {
                 let slots = unsafe {[
@@ -323,7 +331,7 @@ fn render_window_for_slot(i: usize) {
 }
 
 fn render_windows_only() {
-    aixos_gpu::desktop::render_desktop();
+    aixos_gpu::desktop::render_desktop(unsafe { &DESKTOP_STATE });
     aixos_gpu::desktop::render_top_bar_icons();
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
@@ -343,7 +351,7 @@ fn render_windows_only() {
 }
 
 fn render_all_windows() {
-    aixos_gpu::desktop::render_desktop();
+    aixos_gpu::desktop::render_desktop(unsafe { &DESKTOP_STATE });
     aixos_gpu::desktop::render_top_bar_icons();
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
