@@ -152,7 +152,7 @@ pub fn render_desktop(state: &DesktopState) {
     draw_hline(rx + 1, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
     draw_str(rx + 16, TOP_BAR_H + 28, "SYSTEM", 0x44446A);
     let icon_labels: [&str; 6] = ["O","F","S","A","D","N"];
-    let icon_colors: [u32; 6] = [SOVEREIGN_PURPLE,0x1850A0,SETTINGS_BLUE,0x8B4FDB,BROWSE_GREEN,ACCENT_TEAL];
+    let icon_colors: [u32; 6] = [SOVEREIGN_PURPLE,0x1850A0,SETTINGS_BLUE,0x331A4A,BROWSE_GREEN,0x1A3A3A]; // A,N dimmed=stub
     let mut ii = 0u32;
     while ii < 6 {
         let col = ii % 3;

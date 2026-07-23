@@ -650,6 +650,53 @@ fn handle_click(x: i32, y: i32) {
                 return;
             }
         }
+        // Right panel SYSTEM icon grid click
+        if x >= 1092 && x < 1280 {
+            let rx: i32 = 1092;
+            let mut icon_hit: i32 = -1;
+            let mut ci = 0i32;
+            while ci < 6 {
+                let col = ci % 3;
+                let row = ci / 3;
+                let ix = rx + 16 + col * 44;
+                let iy = 38 + 42 + row * 44;
+                if x >= ix && x < ix + 36 && y >= iy && y < iy + 36 {
+                    icon_hit = ci;
+                    break;
+                }
+                ci += 1;
+            }
+            if icon_hit >= 0 {
+                let kind: i32 = match icon_hit {
+                    0 => 0, // O -> Node
+                    1 => 2, // F -> EDB Store
+                    2 => 3, // S -> Settings
+                    3 => 3, // A -> Settings placeholder
+                    4 => 4, // D -> EDB Browser
+                    _ => -1,
+                };
+                if kind >= 0 {
+                    unsafe {
+                        WINDOW_FOCUSED = false;
+                        if let Some(i) = find_kind(kind as u8) {
+                            ACTIVE_WIN = i;
+                        } else if let Some(slot) = find_free() {
+                            wins()[slot].open = true;
+                            wins()[slot].kind = kind as u8;
+                            ACTIVE_WIN = slot;
+                            if kind == 4 {
+                                EDB_CURSOR = 0;
+                                EDB_SCROLL = 0;
+                                EDB_FOCUSED = false;
+                                EDB_INPUT.clear();
+                            }
+                        }
+                    }
+                    render_all_windows();
+                    return;
+                }
+            }
+        }
         // Left panel SPACES click
         if x >= 8 && x < 196 {
             // y positions: SPACES label at TOP_BAR_H+8+108=154
