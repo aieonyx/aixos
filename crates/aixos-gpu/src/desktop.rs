@@ -363,7 +363,7 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
     if let Ok(txt) = core::str::from_utf8(&buf[..len]) {
         draw_str((wx + 48) as u32, y as u32, txt, TEXT_WHITE);
     }
-    draw_str((wx + 48 + (len as i32) * 8) as u32, y as u32, "_", TEXT_WHITE);
+    draw_str((wx + 48 + (len as i32) * 9) as u32, y as u32, "_", TEXT_WHITE);
     if focused {
         // Draw [focused] inside window right edge
         let fx = (wx as u32 + ww).saturating_sub(80);
@@ -430,7 +430,7 @@ pub fn render_edb_browser(
     if let Ok(txt) = core::str::from_utf8(&input_buf[..input_len]) {
         draw_str(buf_x, input_row_y + 2, txt, TEXT_WHITE);
     }
-    draw_str(buf_x + (input_len as u32) * 8, input_row_y + 2, "_", TEXT_WHITE);
+    draw_str(buf_x + (input_len as u32) * 9, input_row_y + 2, "_", TEXT_WHITE);
     if focused { draw_str(wx_u + w - 80, input_row_y + 2, "[focused]", TEXT_DIM); }
     draw_rect(wx_u + w - 12, (wy + h as i32 - 12) as u32, 12, 12, ACCENT_TEAL);
     draw_rect(wx_u + w - 8,  (wy + h as i32 - 8) as u32,  4,  4,  TEXT_WHITE);

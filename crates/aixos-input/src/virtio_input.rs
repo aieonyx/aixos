@@ -38,6 +38,12 @@ const VIRTQ_AVAIL_F_NO_INTERRUPT: u16 = 1;
 pub const EV_KEY: u16 = 0x01;
 pub const EV_VALUE_PRESS: u32 = 1;
 pub const EV_VALUE_REPEAT: u32 = 2;
+const OFF_CFG_SEL:    usize = 0x100;
+const OFF_CFG_SUBSEL: usize = 0x101;
+const OFF_CFG_SIZE:   usize = 0x102;
+const OFF_CFG_DATA:   usize = 0x108;
+const CFG_EV_BITS:    u8 = 0x11;
+const EV_ABS_TYPE:    u8 = 0x03;
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -99,6 +105,24 @@ unsafe fn mmio_write(base: usize, off: usize, val: u32) {
     write_volatile((base + off) as *mut u32, val);
 }
 
+unsafe fn cfg_write8(base: usize, off: usize, val: u8) {
+    write_volatile((base + off) as *mut u8, val);
+}
+
+unsafe fn cfg_read8(base: usize, off: usize) -> u8 {
+    read_volatile((base + off) as *const u8)
+}
+
+fn is_tablet(base: usize) -> bool {
+    unsafe {
+        cfg_write8(base, OFF_CFG_SEL, CFG_EV_BITS);
+        cfg_write8(base, OFF_CFG_SUBSEL, EV_ABS_TYPE);
+        let size = cfg_read8(base, OFF_CFG_SIZE);
+        if size == 0 { return false; }
+        cfg_read8(base, OFF_CFG_DATA) & 0x03 != 0
+    }
+}
+
 pub fn is_initialized() -> bool {
     // PL-14 fix: report true only after driver_ok handshake succeeded
     unsafe { DRIVER_OK_WRITTEN && DEVICE_BASE != 0 }
@@ -125,6 +149,10 @@ pub fn probe() -> Option<(usize, u32)> {
             write_volatile(uart, nb[(dev & 0xf) as usize]);
             write_volatile(uart, b' ');
             if (ver == 1 || ver == 2) && dev == DEVICE_ID_INPUT {
+                if is_tablet(base) {
+                    write_volatile(uart, b'A');
+                    continue;
+                }
                 DEVICE_VER = ver;
                 write_volatile(uart, b'F');
                 write_volatile(uart, b'\n');
@@ -229,8 +257,10 @@ pub fn poll_event() -> Option<VirtioInputEvent> {
             let used_slot = (LAST_SEEN as usize) % QUEUE_SIZE;
             let id = read_volatile(addr_of!((*ring).used.ring[used_slot].id)) as usize;
             let slot = id % QUEUE_SIZE;
+            dsb(); // ensure event buffer is visible after used ring update
             let events = addr_of!(EVENT_BUF) as *const VirtioInputEvent;
             let ev = read_volatile(events.add(slot));
+            dsb();
             let avail_slot = (AVAIL_IDX as usize) % QUEUE_SIZE;
             write_volatile(addr_of_mut!((*ring).avail.ring[avail_slot]), slot as u16);
             dsb();
@@ -238,8 +268,9 @@ pub fn poll_event() -> Option<VirtioInputEvent> {
             write_volatile(addr_of_mut!((*ring).avail.idx), AVAIL_IDX);
             mmio_write(base, OFF_QUEUE_NOTIFY, 0);
             LAST_SEEN = LAST_SEEN.wrapping_add(1);
-            if ev.ev_type == EV_KEY
-               && (ev.value == EV_VALUE_PRESS || ev.value == EV_VALUE_REPEAT) {
+            // Return ALL EV_KEY events — poll() in lib.rs filters releases
+            // Shift release must pass through to clear SHIFT_ACTIVE
+            if ev.ev_type == EV_KEY {
                 return Some(ev);
             }
         }

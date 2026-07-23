@@ -35,9 +35,33 @@ const KEY_RIGHTSHIFT: u16 = 54;
 static mut SHIFT_ACTIVE: bool = false;
 
 /// Poll for a key event.
-/// Priority: UART first (reliable via -serial stdio), then virtio-input.
+/// Priority: virtio-input first (GTK window), then UART (terminal).
 pub fn poll() -> Option<KeyEvent> {
-    // UART path
+    // virtio-input path first — GTK window keyboard
+    if virtio_input::is_initialized() {
+        loop {
+            let ev = match virtio_input::poll_event() {
+                Some(e) => e,
+                None => break,
+            };
+            if ev.code == KEY_LEFTSHIFT || ev.code == KEY_RIGHTSHIFT {
+                unsafe {
+                    SHIFT_ACTIVE = ev.value == EV_VALUE_PRESS || ev.value == EV_VALUE_REPEAT;
+                }
+                continue;
+            }
+            if ev.ev_type != EV_KEY { continue; }
+            if ev.value != EV_VALUE_PRESS && ev.value != EV_VALUE_REPEAT { continue; }
+            let shifted = unsafe { SHIFT_ACTIVE };
+            return Some(KeyEvent {
+                code: ev.code,
+                value: ev.value,
+                ch: evdev_to_char(ev.code, shifted),
+            });
+        }
+    }
+
+    // UART path — terminal keyboard (fallback)
     if let Some(b) = uart_kbd::read_byte() {
         let code: u16 = match b {
             b'\r' | b'\n' => 28,
@@ -52,37 +76,7 @@ pub fn poll() -> Option<KeyEvent> {
         });
     }
 
-    // virtio-input path
-    if !virtio_input::is_initialized() { return None; }
-
-    // Drain all pending events, tracking shift state.
-    // Return the first non-modifier key press.
-    loop {
-        let ev = virtio_input::poll_event()?;
-
-        // Track shift key state (press and release)
-        if ev.code == KEY_LEFTSHIFT || ev.code == KEY_RIGHTSHIFT {
-            unsafe {
-                SHIFT_ACTIVE = ev.value == EV_VALUE_PRESS || ev.value == EV_VALUE_REPEAT;
-            }
-            continue; // consume shift event, keep polling
-        }
-
-        // Only deliver key press and repeat events
-        if ev.ev_type != EV_KEY {
-            continue;
-        }
-        if ev.value != EV_VALUE_PRESS && ev.value != EV_VALUE_REPEAT {
-            continue; // discard key release events
-        }
-
-        let shifted = unsafe { SHIFT_ACTIVE };
-        return Some(KeyEvent {
-            code: ev.code,
-            value: ev.value,
-            ch: evdev_to_char(ev.code, shifted),
-        });
-    }
+    None
 }
 
 pub fn evdev_to_char(code: u16, shift: bool) -> Option<char> {

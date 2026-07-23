@@ -254,16 +254,14 @@ fn render_window_for_slot(i: usize) {
     aixos_gpu::desktop::set_window_pos(w.x, w.y);
     match w.kind {
         1 => {
-            aixos_gpu::desktop::render_window(
-                "Shell - aiXos Phoenix",
-                &["axos> sovereign shell", "type commands below", "",
-                  "PL-24: shell window stub"],
-                w.w, w.h);
             unsafe {
                 let focused = WINDOW_FOCUSED && ACTIVE_WIN == i;
-                aixos_gpu::desktop::render_window_output_hw(w.x, w.y, win_output(), WIN_OUTPUT_LEN, w.h, w.w);
+                aixos_gpu::desktop::render_window("Shell", &[], w.w, w.h);
+                aixos_gpu::desktop::render_window_output_hw(
+                    w.x, w.y, win_output(), WIN_OUTPUT_LEN, w.h, w.w);
                 let b = win_buf();
-                aixos_gpu::desktop::render_window_input_hw(w.x, w.y, b.as_slice(), b.len, focused, w.h, w.w);
+                aixos_gpu::desktop::render_window_input_hw(
+                    w.x, w.y, b.as_slice(), b.len, focused, w.h, w.w);
             }
         }
         2 => aixos_gpu::desktop::render_window(
@@ -518,7 +516,7 @@ fn handle_window_key(code: u16, ch: Option<char>) {
         1 => unsafe {
             WINDOW_FOCUSED = false;
             win_buf().clear();
-            aixos_gpu::desktop::render_window_input(wx, wy, &[], 0, false);
+            render_all_windows();
         },
         28 => unsafe {
             let echo = push_echo();
@@ -526,23 +524,16 @@ fn handle_window_key(code: u16, ch: Option<char>) {
             let result = execute_cmd(win_buf());
             push_output(result);
             win_buf().clear();
-            if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
-                aixos_gpu::desktop::render_window_output(wx, wy, win_output(), WIN_OUTPUT_LEN);
-                aixos_gpu::desktop::render_window_input(wx, wy, &[], 0, WINDOW_FOCUSED);
-            }
+            render_all_windows();
         },
         14 => unsafe {
             win_buf().pop();
-            let b = win_buf();
-            aixos_gpu::desktop::render_window_input(wx, wy, b.as_slice(), b.len, WINDOW_FOCUSED);
+            render_all_windows();
         },
         _ => {
             if let Some(c) = ch {
                 win_buf().push(c as u8);
-                let b = win_buf();
-                unsafe {
-                    aixos_gpu::desktop::render_window_input(wx, wy, b.as_slice(), b.len, WINDOW_FOCUSED);
-                }
+                render_all_windows();
             }
         }
     }
@@ -657,6 +648,15 @@ fn shell_loop(
             }
         }
         if let Some(ev) = aixos_input::poll() {
+            unsafe {
+                let uart = 0x09000000 as *mut u8;
+                let hex = b"0123456789abcdef";
+                // Log: T=type C=code V=value
+                core::ptr::write_volatile(uart, b'T');
+                core::ptr::write_volatile(uart, hex[((ev.code >> 4) & 0xf) as usize]);
+                core::ptr::write_volatile(uart, hex[(ev.code & 0xf) as usize]);
+                core::ptr::write_volatile(uart, b'\n');
+            }
             handle_key(&mut buf, ev.code, ev.ch);
         }
     }
