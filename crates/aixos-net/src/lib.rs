@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), no_std)]
 use aixos_kernel::SovereignBoot;
 pub mod wireguard_stub;
+pub mod virtio_net;
 
 pub struct AwpLite;
 
@@ -25,10 +26,14 @@ pub fn send(node_id: u64, version: u32) -> u64 {
 }
 
 /// AWP loopback confirms socket layer is initialized.
-/// Sends a probe with node_id=1, version=1 and checks the tag is non-zero.
+/// On bare metal: uses virtio_net TX if available, else tag check.
 pub fn loopback_test() -> bool {
-    let tag = send(1, 1);
-    tag != 0
+    if virtio_net::is_live() {
+        virtio_net::send_awp_frame(1, b"AWP:loopback")
+    } else {
+        let tag = send(1, 1);
+        tag != 0
+    }
 }
 
 impl SovereignBoot for AwpLite {

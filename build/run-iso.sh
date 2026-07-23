@@ -14,6 +14,7 @@ fi
 
 echo "Booting aiXos Phoenix Lite..."
 qemu-system-aarch64 \
+  -netdev user,id=net0 -device virtio-net-device,netdev=net0 \
     -machine virt \
     -cpu cortex-a72 \
     -m 512M \

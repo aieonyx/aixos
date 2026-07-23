@@ -327,6 +327,20 @@ pub extern "C" fn aixos_main() -> ! {
     aixos_edisondb::init();
     // PL-50: AXFS init — seeds readme.txt
     aixos_axfs::init();
+    // PL-53: probe virtio-net and send boot AWP frame
+    {
+        let net_live = aixos_net::virtio_net::init();
+        if net_live {
+            uart_write("virtio-net: live\n");
+            aixos_net::virtio_net::send_awp_frame(
+                aixos_identity::node_id(),
+                b"boot:awp:sovereign"
+            );
+            uart_write("AWP: boot frame sent\n");
+        } else {
+            uart_write("virtio-net: not found\n");
+        }
+    }
     // PL-51: restore persisted identity from EdisonDB + AXFS on boot
     unsafe {
         // Restore tz offset
@@ -510,45 +524,39 @@ fn render_window_for_slot(i: usize) {
                 );
             }
         }
-        5 => aixos_gpu::desktop::render_window(
-            "Network - aiXos Phoenix",
-            &["AWP:    stub  loopback only",
-              "Peers:  0  (no live AWP path yet)",
-              "Node:   40100001  aarch64",
-              "Stack:  virtio-net (not wired)",
-              "Proto:  AWP v0.1  sovereign mesh",
-              "Status: isolated  local only"],
-            w.w, w.h),
-        6 => {
-            unsafe {
-                let count = aixos_axfs::count();
-                static mut FILE_NAME_PTRS: [(*const u8, usize); 8] = [(core::ptr::null(), 0); 8];
-                let n = count.min(8);
-                let mut fi = 0;
-                while fi < n {
-                    if let Some(f) = aixos_axfs::file_at(fi) {
-                        let nb = f.name_bytes();
-                        FILE_NAME_PTRS[fi] = (nb.as_ptr(), nb.len());
-                    }
-                    fi += 1;
-                }
-                let content = if FILES_VIEWING {
-                    &FILES_CONTENT_BUF[..FILES_CONTENT_LEN]
+        5 => {
+            let awp_status = if aixos_net::virtio_net::is_live() {
+                "AWP:    live  virtio-net wired"
+            } else {
+                "AWP:    stub  no virtio-net"
+            };
+            let frames = aixos_net::virtio_net::frames_sent();
+            // format frames_sent into static buffer
+            static mut NET_STATUS_BUF: [u8; 32] = [0u8; 32];
+            let frames_str = unsafe {
+                let b = &mut *core::ptr::addr_of_mut!(NET_STATUS_BUF);
+                b[..8].copy_from_slice(b"Frames: ");
+                let mut n = frames;
+                let mut pos = 8usize;
+                if n == 0 {
+                    b[pos] = b'0'; pos += 1;
                 } else {
-                    &[][..]
-                };
-                aixos_gpu::desktop::set_window_pos(w.x, w.y);
-                aixos_gpu::desktop::render_window("AXFS - Files", &[], w.w, w.h);
-                aixos_gpu::desktop::render_files_window(
-                    w.x, w.y, w.w, w.h,
-                    &FILE_NAME_PTRS[..n],
-                    count,
-                    FILES_CURSOR,
-                    content,
-                    FILES_CONTENT_LEN,
-                    FILES_VIEWING,
-                );
-            }
+                    let mut tmp = [0u8; 10];
+                    let mut tlen = 0usize;
+                    while n > 0 { tmp[tlen] = b'0' + (n % 10) as u8; tlen += 1; n /= 10; }
+                    let mut ti = tlen;
+                    while ti > 0 { ti -= 1; b[pos] = tmp[ti]; pos += 1; }
+                }
+                core::str::from_utf8_unchecked(&b[..pos])
+            };
+            aixos_gpu::desktop::render_window(
+                "Network - aiXos Phoenix",
+                &[awp_status,
+                  frames_str,
+                  "Peers:  0  (discovery PL-54)",
+                  "Proto:  AWP v0.1  sovereign mesh",
+                  "Status: isolated  local only"],
+                w.w, w.h)
         }
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
@@ -647,20 +655,11 @@ fn handle_files_key(code: u16) {
     unsafe {
         let count = aixos_axfs::count();
         if FILES_VIEWING {
-            if code == 1 {
-                FILES_VIEWING = false;
-                render_all_windows();
-            }
+            if code == 1 { FILES_VIEWING = false; render_all_windows(); }
         } else {
             match code {
-                103 => {
-                    if FILES_CURSOR > 0 { FILES_CURSOR -= 1; }
-                    render_all_windows();
-                }
-                108 => {
-                    if count > 0 && FILES_CURSOR + 1 < count { FILES_CURSOR += 1; }
-                    render_all_windows();
-                }
+                103 => { if FILES_CURSOR > 0 { FILES_CURSOR -= 1; } render_all_windows(); }
+                108 => { if count > 0 && FILES_CURSOR + 1 < count { FILES_CURSOR += 1; } render_all_windows(); }
                 28 => {
                     if FILES_CURSOR < count {
                         if let Some(f) = aixos_axfs::file_at(FILES_CURSOR) {
@@ -676,11 +675,7 @@ fn handle_files_key(code: u16) {
                     }
                 }
                 1 => {
-                    if let Some(i) = find_kind(6) {
-                        wins()[i].open = false;
-                        FILES_CURSOR = 0;
-                        FILES_VIEWING = false;
-                    }
+                    if let Some(i) = find_kind(6) { wins()[i].open = false; FILES_CURSOR = 0; FILES_VIEWING = false; }
                     render_all_windows();
                 }
                 _ => {}
@@ -697,7 +692,7 @@ fn handle_dock_click(x: i32, y: i32) {
             0 => 0, // Onyxia -> Node window (placeholder)
             1 => 0, // Browser -> Node window (placeholder)
             2 => 1, // Shell
-            3 => 6, // Files -> AXFS Files window (PL-52)
+            3 => 2, // Files -> EDB store (closest match)
             4 => 4, // EDB Browser
             5 => 3, // IAM -> Settings (placeholder)
             6 => 3, // Settings
@@ -717,7 +712,7 @@ fn handle_dock_click(x: i32, y: i32) {
                 }
                 // If no free slot, do nothing (all 5 windows open)
             }
-            if kind == 1 || kind == 6 { WINDOW_FOCUSED = true; }
+            if kind == 1 { WINDOW_FOCUSED = true; }
             if kind == 4 {
                 EDB_CURSOR = 0;
                 EDB_SCROLL = 0;
@@ -1091,7 +1086,7 @@ fn shell_loop(
 fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
     unsafe {
 
-        if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && (wins()[ACTIVE_WIN].kind == 1 || wins()[ACTIVE_WIN].kind == 6) {
+        if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
             handle_window_key(code, ch);
             return;
         }
