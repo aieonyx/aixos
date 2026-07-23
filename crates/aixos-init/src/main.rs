@@ -650,7 +650,25 @@ fn handle_click(x: i32, y: i32) {
                 return;
             }
         }
-        // Empty canvas click — no action (sovereign desktop)
+        // Left panel SPACES click
+        if x >= 8 && x < 196 {
+            // y positions: SPACES label at TOP_BAR_H+8+108=154
+            // Items at 154+8=162, 154+34=188, 154+54=208, 154+74=228
+            let base_y: i32 = 38 + 8 + 116;
+            let py = y - base_y;
+            let new_space: i32 =
+                if py >= 0 && py < 22 { 0 }
+                else if py >= 26 && py < 48 { 1 }
+                else if py >= 46 && py < 68 { 2 }
+                else if py >= 66 && py < 88 { 3 }
+                else { -1 };
+            if new_space >= 0 {
+                unsafe { DESKTOP_STATE.active_space = new_space as u8; }
+                render_all_windows();
+                return;
+            }
+        }
+        // Empty canvas click — no action
         let _ = (x, y);
     }
 }

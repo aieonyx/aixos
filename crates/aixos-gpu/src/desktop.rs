@@ -40,12 +40,13 @@ pub struct DesktopState {
     pub rtc_min:     u8,
     pub rtc_day:     u8,
     pub rtc_mon:     u8,
+    pub active_space: u8,
 }
 impl DesktopState {
     pub const fn default() -> Self {
         DesktopState {
             node_id: 0, proof: 0x4153, edb_live: false,
-            entry_count: 0, desktop_ok: false, uptime_sec: 0,
+            entry_count: 0, desktop_ok: false, uptime_sec: 0, active_space: 0,
             rtc_hour: 0, rtc_min: 0, rtc_day: 0, rtc_mon: 0,
         }
     }
@@ -113,16 +114,26 @@ pub fn render_desktop(state: &DesktopState) {
     draw_str(60, TOP_BAR_H + 68, "Sovereign", 0x44446A);
     draw_hline(16, TOP_BAR_H + 90, PANEL_W - 16, GLASS_BORDER);
     draw_str(24, TOP_BAR_H + 108, "SPACES", 0x44446A);
-    draw_rect(16, TOP_BAR_H + 116, PANEL_W - 16, 24, SOVEREIGN_PURPLE);
-    blend_rect(16, TOP_BAR_H + 116, PANEL_W - 16, 24, 0x000000, 180);
-    draw_rect(24, TOP_BAR_H + 122, 3, 12, SOVEREIGN_PURPLE);
-    draw_str(34, TOP_BAR_H + 130, "Desktop", TEXT_WHITE);
-    draw_rect(24, TOP_BAR_H + 150, 3, 10, 0x33334A);
-    draw_str(34, TOP_BAR_H + 158, "Files", 0x55556A);
-    draw_rect(24, TOP_BAR_H + 170, 3, 10, 0x33334A);
-    draw_str(34, TOP_BAR_H + 178, "Onyxia", 0x55556A);
-    draw_rect(24, TOP_BAR_H + 190, 3, 10, 0x33334A);
-    draw_str(34, TOP_BAR_H + 198, "EdisonDB", 0x55556A);
+    let space_labels: [&str; 4] = ["Desktop", "Files", "Onyxia", "EdisonDB"];
+    let space_y: [u32; 4] = [
+        TOP_BAR_H + 116, TOP_BAR_H + 142,
+        TOP_BAR_H + 162, TOP_BAR_H + 182,
+    ];
+    let mut si = 0u32;
+    while si < 4 {
+        let sy = space_y[si as usize];
+        let is_active = si == state.active_space as u32;
+        if is_active {
+            draw_rect(16, sy, PANEL_W - 16, 22, SOVEREIGN_PURPLE);
+            blend_rect(16, sy, PANEL_W - 16, 22, 0x000000, 180);
+            draw_rect(24, sy + 5, 3, 12, SOVEREIGN_PURPLE);
+            draw_str(34, sy + 13, space_labels[si as usize], TEXT_WHITE);
+        } else {
+            draw_rect(24, sy + 6, 3, 10, 0x33334A);
+            draw_str(34, sy + 13, space_labels[si as usize], 0x55556A);
+        }
+        si += 1;
+    }
     draw_hline(16, TOP_BAR_H + 218, PANEL_W - 16, GLASS_BORDER);
     draw_str(24, TOP_BAR_H + 234, "BASTION STATUS", 0x44446A);
     let pol_col = if state.edb_live { ACCENT_TEAL } else { 0x444444 };
