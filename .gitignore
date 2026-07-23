@@ -5,3 +5,6 @@ asl/target/
 *.d
 dist/*.iso
 iso-root/
+boot/aixos.bin
+boot/aixos.elf
+boot/aixos.img
