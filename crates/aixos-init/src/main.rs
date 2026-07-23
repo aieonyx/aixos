@@ -152,6 +152,8 @@ static mut RESIZE_ACTIVE: bool = false;
 static mut RESIZE_WIN: usize = 0;
 static mut BOOT_TICK: u64 = 0;
 static mut CNTFRQ: u64 = 62_500_000;
+const PL031_BASE: usize = 0x0901_0000;
+const PL031_DR:   usize = 0x000;
 static mut DESKTOP_STATE: aixos_gpu::desktop::DesktopState = aixos_gpu::desktop::DesktopState::default();
 static mut EDB_CURSOR: usize = 0;
 static mut EDB_SCROLL: usize = 0;
@@ -217,9 +219,14 @@ pub extern "C" fn aixos_main() -> ! {
                 let elapsed = now.saturating_sub(BOOT_TICK);
                 DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
             }
+            let (rh, rm, rd, rmon) = read_rtc();
+            DESKTOP_STATE.rtc_hour = rh;
+            DESKTOP_STATE.rtc_min  = rm;
+            DESKTOP_STATE.rtc_day  = rd;
+            DESKTOP_STATE.rtc_mon  = rmon;
             aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
         }
-            aixos_gpu::desktop::render_top_bar_icons(unsafe { DESKTOP_STATE.uptime_sec });
+            unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
             {
                 let slots = unsafe {[
                     (wins()[0].open, wins()[0].kind),
@@ -360,9 +367,14 @@ fn render_windows_only() {
                 let elapsed = now.saturating_sub(BOOT_TICK);
                 DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
             }
+            let (rh, rm, rd, rmon) = read_rtc();
+            DESKTOP_STATE.rtc_hour = rh;
+            DESKTOP_STATE.rtc_min  = rm;
+            DESKTOP_STATE.rtc_day  = rd;
+            DESKTOP_STATE.rtc_mon  = rmon;
             aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
         }
-    aixos_gpu::desktop::render_top_bar_icons(unsafe { DESKTOP_STATE.uptime_sec });
+    unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 5 {
@@ -389,9 +401,14 @@ fn render_all_windows() {
                 let elapsed = now.saturating_sub(BOOT_TICK);
                 DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
             }
+            let (rh, rm, rd, rmon) = read_rtc();
+            DESKTOP_STATE.rtc_hour = rh;
+            DESKTOP_STATE.rtc_min  = rm;
+            DESKTOP_STATE.rtc_day  = rd;
+            DESKTOP_STATE.rtc_mon  = rmon;
             aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
         }
-    aixos_gpu::desktop::render_top_bar_icons(unsafe { DESKTOP_STATE.uptime_sec });
+    unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon); }
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 5 {
@@ -636,6 +653,37 @@ fn handle_click(x: i32, y: i32) {
         // Empty canvas click — no action (sovereign desktop)
         let _ = (x, y);
     }
+}
+
+fn read_rtc() -> (u8, u8, u8, u8) {
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        let ts = core::ptr::read_volatile((PL031_BASE + PL031_DR) as *const u32) as u64;
+        let time_of_day = ts % 86400;
+        let hour = (time_of_day / 3600) as u8;
+        let min  = ((time_of_day % 3600) / 60) as u8;
+        let mut days = ts / 86400;
+        let mut y: u64 = 1970;
+        loop {
+            let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+            let ydays: u64 = if leap { 366 } else { 365 };
+            if days < ydays { break; }
+            days -= ydays;
+            y += 1;
+        }
+        let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+        let month_days: [u64; 12] = [31,28,31,30,31,30,31,31,30,31,30,31];
+        let mut mon: u8 = 1;
+        for ml in month_days.iter() {
+            let ml2 = if leap && mon == 2 { ml + 1 } else { *ml };
+            if days < ml2 { break; }
+            days -= ml2;
+            mon += 1;
+        }
+        return (hour, min, (days + 1) as u8, mon);
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    (0, 0, 1, 1)
 }
 
 fn shell_loop(

@@ -36,12 +36,17 @@ pub struct DesktopState {
     pub entry_count: usize,
     pub desktop_ok:  bool,
     pub uptime_sec:  u64,
+    pub rtc_hour:    u8,
+    pub rtc_min:     u8,
+    pub rtc_day:     u8,
+    pub rtc_mon:     u8,
 }
 impl DesktopState {
     pub const fn default() -> Self {
         DesktopState {
             node_id: 0, proof: 0x4153, edb_live: false,
             entry_count: 0, desktop_ok: false, uptime_sec: 0,
+            rtc_hour: 0, rtc_min: 0, rtc_day: 0, rtc_mon: 0,
         }
     }
 }
@@ -177,7 +182,7 @@ pub fn render_desktop(state: &DesktopState) {
 }
 
 
-pub fn render_top_bar_icons(uptime_sec: u64) {
+pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day: u8, rtc_mon: u8) {
     draw_rect(0, 0, 1280, TOP_BAR_H, 0x08060F);
     draw_hline(0, 0, 1280, 0x2A2848);
     draw_hline(0, TOP_BAR_H - 1, 1280, 0x1A1830);
@@ -189,17 +194,23 @@ pub fn render_top_bar_icons(uptime_sec: u64) {
     draw_rounded_border(380, 8, 240, 22, 8, 0x2A2848);
     draw_str(406, 19, "Ask IAM anything...", 0x33334A);
     // Clock drawn in render_desktop() where state is in scope
-    // Live uptime clock + teal dot — top right
-    let mm = (uptime_sec / 60) % 60;
-    let ss = uptime_sec % 60;
+    // Real date+time from PL031 RTC
     let digs = b"0123456789";
-    draw_str(1148, 15, "+", 0x444466);
-    crate::font::draw_char(1156, 15, digs[((mm / 10) % 10) as usize] as char, 0x888899);
-    crate::font::draw_char(1164, 15, digs[(mm % 10) as usize] as char, 0x888899);
-    draw_str(1172, 15, ":", 0x666688);
-    crate::font::draw_char(1180, 15, digs[((ss / 10) % 10) as usize] as char, 0x888899);
-    crate::font::draw_char(1188, 15, digs[(ss % 10) as usize] as char, 0x888899);
-    draw_rect(1200, 15, 6, 6, ACCENT_TEAL);
+    let _ = uptime_sec;
+    let months = ["   ","Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"];
+    let mon_str = if (rtc_mon as usize) < 13 { months[rtc_mon as usize] } else { "???" };
+    draw_str(1080, 15, mon_str, 0x888899);
+    crate::font::draw_char(1112, 15, digs[((rtc_day / 10) % 10) as usize] as char, 0x888899);
+    crate::font::draw_char(1120, 15, digs[(rtc_day % 10) as usize] as char, 0x888899);
+    draw_str(1130, 15, " ", 0x666688);
+    crate::font::draw_char(1138, 15, digs[((rtc_hour / 10) % 10) as usize] as char, 0x888899);
+    crate::font::draw_char(1146, 15, digs[(rtc_hour % 10) as usize] as char, 0x888899);
+    draw_str(1154, 15, ":", 0x666688);
+    crate::font::draw_char(1162, 15, digs[((rtc_min / 10) % 10) as usize] as char, 0x888899);
+    crate::font::draw_char(1170, 15, digs[(rtc_min % 10) as usize] as char, 0x888899);
+    draw_str(1190, 15, "UTC", 0x444466);
+    draw_rect(1230, 15, 6, 6, ACCENT_TEAL);
 }
 
 
