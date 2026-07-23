@@ -150,6 +150,8 @@ static mut DRAG_OFF_X: i32 = 0;
 static mut DRAG_OFF_Y: i32 = 0;
 static mut RESIZE_ACTIVE: bool = false;
 static mut RESIZE_WIN: usize = 0;
+static mut BOOT_TICK: u64 = 0;
+static mut CNTFRQ: u64 = 62_500_000;
 static mut DESKTOP_STATE: aixos_gpu::desktop::DesktopState = aixos_gpu::desktop::DesktopState::default();
 static mut EDB_CURSOR: usize = 0;
 static mut EDB_SCROLL: usize = 0;
@@ -162,6 +164,15 @@ static mut EDB_ENTRIES: [(&'static str, &'static str, u64); 32] = [("", "", 0u64
 pub extern "C" fn aixos_main() -> ! {
     uart_write("aiXos Phoenix - Sovereign Stack Initializing...\n");
 
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        let tick: u64;
+        let freq: u64;
+        core::arch::asm!("mrs {}, cntpct_el0", out(reg) tick);
+        core::arch::asm!("mrs {}, cntfrq_el0", out(reg) freq);
+        BOOT_TICK = tick;
+        if freq > 0 { CNTFRQ = freq; }
+    }
     let proof = aixos_init::orchestrate();
     if proof == 0x4153 {
         uart_write("axon_main() -> 0x4153 [SOVEREIGN]\n");
@@ -185,6 +196,7 @@ pub extern "C" fn aixos_main() -> ! {
         DESKTOP_STATE.edb_live    = aixos_edisondb::is_live();
         DESKTOP_STATE.entry_count = aixos_edisondb::entry_count();
         DESKTOP_STATE.desktop_ok  = true;
+        DESKTOP_STATE.uptime_sec  = 0;
     }
 
     match aixos_gpu::init() {
@@ -197,8 +209,17 @@ pub extern "C" fn aixos_main() -> ! {
                 unsafe { core::ptr::read_volatile(&splash_delay); }
                 splash_delay += 1;
             }
-            aixos_gpu::desktop::render_desktop(unsafe { &DESKTOP_STATE });
-            aixos_gpu::desktop::render_top_bar_icons();
+            unsafe {
+            #[cfg(target_arch = "aarch64")]
+            {
+                let now: u64;
+                core::arch::asm!("mrs {}, cntpct_el0", out(reg) now);
+                let elapsed = now.saturating_sub(BOOT_TICK);
+                DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
+            }
+            aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
+        }
+            aixos_gpu::desktop::render_top_bar_icons(unsafe { DESKTOP_STATE.uptime_sec });
             {
                 let slots = unsafe {[
                     (wins()[0].open, wins()[0].kind),
@@ -331,8 +352,17 @@ fn render_window_for_slot(i: usize) {
 }
 
 fn render_windows_only() {
-    aixos_gpu::desktop::render_desktop(unsafe { &DESKTOP_STATE });
-    aixos_gpu::desktop::render_top_bar_icons();
+    unsafe {
+            #[cfg(target_arch = "aarch64")]
+            {
+                let now: u64;
+                core::arch::asm!("mrs {}, cntpct_el0", out(reg) now);
+                let elapsed = now.saturating_sub(BOOT_TICK);
+                DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
+            }
+            aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
+        }
+    aixos_gpu::desktop::render_top_bar_icons(unsafe { DESKTOP_STATE.uptime_sec });
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 5 {
@@ -351,8 +381,17 @@ fn render_windows_only() {
 }
 
 fn render_all_windows() {
-    aixos_gpu::desktop::render_desktop(unsafe { &DESKTOP_STATE });
-    aixos_gpu::desktop::render_top_bar_icons();
+    unsafe {
+            #[cfg(target_arch = "aarch64")]
+            {
+                let now: u64;
+                core::arch::asm!("mrs {}, cntpct_el0", out(reg) now);
+                let elapsed = now.saturating_sub(BOOT_TICK);
+                DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
+            }
+            aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
+        }
+    aixos_gpu::desktop::render_top_bar_icons(unsafe { DESKTOP_STATE.uptime_sec });
     let active = unsafe { ACTIVE_WIN };
     let mut i = 0;
     while i < 5 {

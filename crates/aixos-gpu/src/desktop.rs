@@ -35,10 +35,14 @@ pub struct DesktopState {
     pub edb_live:    bool,
     pub entry_count: usize,
     pub desktop_ok:  bool,
+    pub uptime_sec:  u64,
 }
 impl DesktopState {
     pub const fn default() -> Self {
-        DesktopState { node_id: 0, proof: 0x4153, edb_live: false, entry_count: 0, desktop_ok: false }
+        DesktopState {
+            node_id: 0, proof: 0x4153, edb_live: false,
+            entry_count: 0, desktop_ok: false, uptime_sec: 0,
+        }
     }
 }
 
@@ -168,10 +172,12 @@ pub fn render_desktop(state: &DesktopState) {
     draw_str(rx + 30, TOP_BAR_H + 260, "AWP  loopback", 0x888899);
     draw_str(rx + 16, TOP_BAR_H + 276, "EDB:", 0x33334A);
     draw_hex32(rx + 48, TOP_BAR_H + 276, state.entry_count as u32, 0x44446A);
+
+
 }
 
 
-pub fn render_top_bar_icons() {
+pub fn render_top_bar_icons(uptime_sec: u64) {
     draw_rect(0, 0, 1280, TOP_BAR_H, 0x08060F);
     draw_hline(0, 0, 1280, 0x2A2848);
     draw_hline(0, TOP_BAR_H - 1, 1280, 0x1A1830);
@@ -182,8 +188,18 @@ pub fn render_top_bar_icons() {
     draw_rounded_rect(380, 8, 240, 22, 8, 0x14122A);
     draw_rounded_border(380, 8, 240, 22, 8, 0x2A2848);
     draw_str(406, 19, "Ask IAM anything...", 0x33334A);
-    draw_str(1200, 19, "19:24", 0x888899);
-    draw_rect(1192, 15, 6, 6, ACCENT_TEAL);
+    // Clock drawn in render_desktop() where state is in scope
+    // Live uptime clock + teal dot — top right
+    let mm = (uptime_sec / 60) % 60;
+    let ss = uptime_sec % 60;
+    let digs = b"0123456789";
+    draw_str(1148, 15, "+", 0x444466);
+    crate::font::draw_char(1156, 15, digs[((mm / 10) % 10) as usize] as char, 0x888899);
+    crate::font::draw_char(1164, 15, digs[(mm % 10) as usize] as char, 0x888899);
+    draw_str(1172, 15, ":", 0x666688);
+    crate::font::draw_char(1180, 15, digs[((ss / 10) % 10) as usize] as char, 0x888899);
+    crate::font::draw_char(1188, 15, digs[(ss % 10) as usize] as char, 0x888899);
+    draw_rect(1200, 15, 6, 6, ACCENT_TEAL);
 }
 
 
