@@ -83,7 +83,9 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
         }
         // PL-50: cat <filename> — print file contents
         cmd if cmd.starts_with(b"cat ") && cmd.len() > 4 => {
-            let name = &cmd[4..];
+            // trim at first space so 'cat foo.txt extra' still works
+            let raw = &cmd[4..];
+            let name = if let Some(sp) = raw.iter().position(|&b| b == b' ') { &raw[..sp] } else { raw };
             unsafe {
                 if let Some(idx) = aixos_axfs::find(name) {
                     if let Some(f) = aixos_axfs::file_at(idx) {
