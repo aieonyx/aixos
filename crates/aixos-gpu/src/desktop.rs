@@ -200,10 +200,9 @@ pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day:
     draw_rect(12, 13, 14, 2, TEXT_WHITE);
     draw_rect(12, 18, 10, 2, TEXT_WHITE);
     draw_rect(12, 23, 12, 2, TEXT_WHITE);
-    draw_str_15x(34, 10, "aiXos Phoenix", TEXT_WHITE);
-    draw_rounded_rect(380, 8, 240, 22, 8, 0x14122A);
-    draw_rounded_border(380, 8, 240, 22, 8, 0x2A2848);
-    draw_str(406, 19, "Ask IAM anything...", 0x33334A);
+    // aiXos Phoenix centered — left cleared
+    // Centered sovereign wordmark — IAM search deferred to future phase
+    draw_str_15x(494, 10, "aiXos Phoenix", 0x444466);
     // Clock drawn in render_desktop() where state is in scope
     // Real date+time from PL031 RTC
     let digs = b"0123456789";

@@ -795,8 +795,7 @@ fn shell_loop(
                 aixos_gpu::draw_cursor(mouse_state.x, mouse_state.y);
                 if mouse_state.left && !prev_left {
                     if mouse_state.y < 38 {
-                        // Top bar click — hamburger, IAM pill etc (future)
-                        let _ = (mouse_state.x, mouse_state.y);
+                        let _ = (mouse_state.x, mouse_state.y); // top bar click — future
                     } else if mouse_state.y >= 676 {
                         // Dock click
                         handle_dock_click(mouse_state.x, mouse_state.y);
@@ -824,6 +823,7 @@ fn shell_loop(
 
 fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
     unsafe {
+
         if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
             handle_window_key(code, ch);
             return;
