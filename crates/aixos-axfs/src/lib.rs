@@ -1,12 +1,14 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
-// AXFS — Sovereign File System stub (PL-50)
-// In-memory file table: up to 8 files, static allocation, no_std, no alloc.
-// Future: backed by EdisonDB tier store; persistent across reboots via WAL.
+// AXFS — Sovereign File System (PL-50 stub, PL-56 persistent)
+// In-memory file table backed by virtio-blk sovereign disk sectors 16-31.
+// Files persist across reboots when virtio-blk is live.
 #![cfg_attr(not(test), no_std)]
+#[cfg(target_arch = "aarch64")]
+extern crate aixos_kernel;
 
-/// Maximum files in the sovereign file table
-pub const MAX_FILES: usize = 8;
+/// Maximum files in the sovereign file table (matches AXFS_SECTOR_COUNT)
+pub const MAX_FILES: usize = 16;
 /// Maximum file name length (bytes)
 pub const NAME_LEN: usize = 32;
 /// Maximum file content size (bytes)
@@ -70,15 +72,13 @@ pub fn write(name: &[u8], data: &[u8]) -> bool {
     unsafe {
         let fc = FILE_COUNT;
         // Upsert: check if name already exists
-        let mut fi = 0;
-        while fi < fc {
-            if FILES[fi].name_bytes() == &name[..nlen] {
-                FILES[fi].data_len = dlen;
+        for i in 0..fc {
+            if FILES[i].name_bytes() == &name[..nlen] {
+                FILES[i].data_len = dlen;
                 let mut j = 0;
-                while j < dlen { FILES[fi].data[j] = data[j]; j += 1; }
+                while j < dlen { FILES[i].data[j] = data[j]; j += 1; }
                 return true;
             }
-            fi += 1;
         }
         // Append
         if fc >= MAX_FILES {
@@ -108,16 +108,76 @@ pub fn file_at(i: usize) -> Option<&'static AxFile> {
 /// Find file by name, return index or None.
 pub fn find(name: &[u8]) -> Option<usize> {
     unsafe {
-        let mut fi = 0;
-        while fi < FILE_COUNT {
-            if FILES[fi].name_bytes() == name {
-                return Some(fi);
+        for i in 0..FILE_COUNT {
+            if FILES[i].name_bytes() == name {
+                return Some(i);
             }
-            fi += 1;
         }
         None
     }
 }
+
+/// Sync all in-memory AXFS files to sovereign disk (PL-56).
+/// Called after every write() when virtio-blk is live.
+#[cfg(target_arch = "aarch64")]
+pub fn sync_to_disk() {
+    unsafe {
+        let count = FILE_COUNT;
+        let mut slot = 0;
+        while slot < count {
+            let f = &FILES[slot];
+            aixos_kernel::virtio_blk::axfs_write_file(
+                slot,
+                &f.name[..],
+                f.name_len,
+                &f.data[..],
+                f.data_len,
+            );
+            slot += 1;
+        }
+        // Clear remaining slots
+        while slot < aixos_kernel::virtio_blk::AXFS_SECTOR_COUNT {
+            let empty_name = [0u8; 32];
+            let empty_data = [0u8; 256];
+            aixos_kernel::virtio_blk::axfs_write_file(slot, &empty_name, 0, &empty_data, 0);
+            slot += 1;
+        }
+    }
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub fn sync_to_disk() {}
+
+/// Load AXFS files from sovereign disk into memory (PL-56).
+/// Called at boot after virtio-blk init.
+#[cfg(target_arch = "aarch64")]
+pub fn load_from_disk() {
+    unsafe {
+        FILE_COUNT = 0;
+        let mut slot = 0;
+        while slot < aixos_kernel::virtio_blk::AXFS_SECTOR_COUNT && slot < MAX_FILES {
+            let mut name_buf = [0u8; 32];
+            let mut data_buf = [0u8; 256];
+            if let Some((nlen, dlen)) = aixos_kernel::virtio_blk::axfs_read_file(
+                slot, &mut name_buf, &mut data_buf
+            ) {
+                let mut f = AxFile::empty();
+                f.name_len = nlen;
+                let mut i = 0; while i < nlen { f.name[i] = name_buf[i]; i += 1; }
+                f.data_len = dlen;
+                let mut j = 0; while j < dlen { f.data[j] = data_buf[j]; j += 1; }
+                FILES[slot] = f;
+                FILE_COUNT = slot + 1;
+            } else {
+                break; // empty slot — stop
+            }
+            slot += 1;
+        }
+    }
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub fn load_from_disk() {}
 
 #[cfg(test)]
 mod tests {

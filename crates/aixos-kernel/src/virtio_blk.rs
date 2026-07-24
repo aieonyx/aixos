@@ -7,8 +7,6 @@
 const MMIO_SCAN_BASE: usize = 0x0a00_0000;
 const MMIO_STEP:      usize = 0x200;
 const MMIO_SLOTS:     usize = 32;
-// PL-54: hd1 sovereign disk is at slot 30 (0xa003c00) in QEMU virt with 3 devices
-const SOV_DISK_BASE: usize = 0x0a00_3800;
 
 const OFF_MAGIC:       usize = 0x000;
 const OFF_VERSION:     usize = 0x004;
@@ -43,8 +41,14 @@ pub const KEY_SIZE: usize = 32;
 pub const ENTRIES_PER_SECTOR: usize = 12;
 pub const DATA_SECTOR_START: usize = 1;
 pub const DATA_SECTOR_COUNT: usize = 15;
+// PL-56: AXFS file table on disk — sectors 16-31
+pub const AXFS_SECTOR_START: usize = 16;
+pub const AXFS_SECTOR_COUNT: usize = 16; // up to 16 files
+pub const AXFS_NAME_LEN: usize = 32;
+pub const AXFS_DATA_LEN: usize = 256;
+// Sector layout: [0..32]=name [32..36]=name_len [36..40]=data_len [40..296]=data
 
-const QUEUE_SIZE: usize = 64;
+const QUEUE_SIZE: usize = 16;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -152,16 +156,37 @@ pub fn init() -> bool {
 
     #[cfg(target_arch = "aarch64")]
     unsafe {
-        // Direct probe at known sovereign disk address (hd1 slot 30)
-        let base = SOV_DISK_BASE;
-        let magic     = read32(base, OFF_MAGIC);
-        let version   = read32(base, OFF_VERSION);
-        let device_id = read32(base, OFF_DEVICE_ID);
-        if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID && setup(base) {
-                BLK_BASE = base;
-                BLK_LIVE = true;
-                BLK_NEXT = 0; // reset descriptor index
-                return true;
+        let mut slot = 0usize;
+        while slot < MMIO_SLOTS {
+            let base = MMIO_SCAN_BASE + slot * MMIO_STEP;
+            let magic     = read32(base, OFF_MAGIC);
+            let version   = read32(base, OFF_VERSION);
+            let device_id = read32(base, OFF_DEVICE_ID);
+            if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID {
+                if setup(base) {
+                    BLK_BASE = base;
+                    BLK_LIVE = true;
+                    // Check if this is the sovereign disk
+                    if let Some(sec) = read_sector(0) {
+                        let is_sov = sec[0] == SOV_MAGIC[0]
+                            && sec[1] == SOV_MAGIC[1]
+                            && sec[2] == SOV_MAGIC[2]
+                            && sec[3] == SOV_MAGIC[3]
+                            && sec[4] == SOV_MAGIC[4]
+                            && sec[5] == SOV_MAGIC[5]
+                            && sec[6] == SOV_MAGIC[6]
+                            && sec[7] == SOV_MAGIC[7];
+                        let is_zero = sec[0] == 0 && sec[1] == 0 && sec[2] == 0 && sec[3] == 0;
+                        if is_sov || is_zero {
+                            return true;
+                        }
+                    }
+                    // Not sovereign — reset and try next
+                    write32(base, OFF_STATUS, 0);
+                    BLK_LIVE = false;
+                }
+            }
+            slot += 1;
         }
         BLK_LIVE = false;
         false
@@ -256,18 +281,18 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
         flags: data_flags, next: d2 as u16,
     };
     ring.desc[d2] = VirtqDesc {
-        addr:  virt_to_phys(core::ptr::addr_of!(BLK_STATUS).cast::<u8>()),
+        addr:  virt_to_phys(core::ptr::addr_of!(BLK_STATUS) as *const u8),
         len:   1, flags: 0x2, next: 0,
     };
 
     // Cache maintenance
-    dc_clean(ring as *mut BlkRing as *const u8, core::mem::size_of::<BlkRing>());
-    dc_clean(core::ptr::addr_of!(BLK_REQ).cast::<u8>(),
+    dc_clean(ring as *const _ as *const u8, core::mem::size_of::<BlkRing>());
+    dc_clean(core::ptr::addr_of!(BLK_REQ) as *const u8,
              core::mem::size_of::<BlkReqHdr>());
     if is_write {
-        dc_clean(core::ptr::addr_of!(BLK_BUF).cast::<u8>(), SECTOR_SIZE);
+        dc_clean(core::ptr::addr_of!(BLK_BUF) as *const u8, SECTOR_SIZE);
     }
-    dc_invalidate(core::ptr::addr_of!(BLK_STATUS).cast::<u8>(), 1);
+    dc_invalidate(core::ptr::addr_of!(BLK_STATUS) as *const u8, 1);
 
     let slot = (ring.avail.idx as usize) % QUEUE_SIZE;
     ring.avail.ring[slot] = d0 as u16;
@@ -280,7 +305,7 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     // Poll completion with cache invalidation
     let mut timeout = 0u32;
     loop {
-        dc_invalidate(core::ptr::addr_of!(BLK_STATUS).cast::<u8>(), 1);
+        dc_invalidate(core::ptr::addr_of!(BLK_STATUS) as *const u8, 1);
         let status = core::ptr::read_volatile(core::ptr::addr_of!(BLK_STATUS));
         if status != 0xFF { break; }
         if timeout >= 2_000_000 { break; }
@@ -294,20 +319,18 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     BLK_NEXT = BLK_NEXT.wrapping_add(3);
 }
 
-#[allow(unused_unsafe)]
 pub fn store_valid() -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     return false;
     #[cfg(target_arch = "aarch64")]
     unsafe {
         if let Some(sec) = read_sector(0) {
-            return sec[0..8] == SOV_MAGIC;
+            return &sec[0..8] == &SOV_MAGIC;
         }
         false
     }
 }
 
-#[allow(unused_unsafe)]
 pub fn store_format(node_id: u64) -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = node_id; return false; }
@@ -321,7 +344,6 @@ pub fn store_format(node_id: u64) -> bool {
     }
 }
 
-#[allow(unused_unsafe)]
 pub fn store_read(key: &[u8]) -> Option<u64> {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = key; return None; }
@@ -351,7 +373,6 @@ pub fn store_read(key: &[u8]) -> Option<u64> {
     }
 }
 
-#[allow(unused_unsafe)]
 pub fn store_write(key: &[u8], value: u64) -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = (key, value); return false; }
@@ -383,6 +404,54 @@ pub fn store_write(key: &[u8], value: u64) -> bool {
             }
         }
         false
+    }
+}
+
+/// Write one AXFS file entry to sovereign disk sector (AXFS_SECTOR_START + slot).
+#[allow(unused_unsafe)]
+pub fn axfs_write_file(slot: usize, name: &[u8], name_len: usize, data: &[u8], data_len: usize) -> bool {
+    if slot >= AXFS_SECTOR_COUNT { return false; }
+    #[cfg(not(target_arch = "aarch64"))]
+    { let _ = (name, name_len, data, data_len); return false; }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        let mut buf = [0u8; SECTOR_SIZE];
+        // name (32B)
+        let nlen = name_len.min(AXFS_NAME_LEN);
+        let mut i = 0; while i < nlen { buf[i] = name[i]; i += 1; }
+        // name_len (u32 LE at offset 32)
+        let nl = (nlen as u32).to_le_bytes();
+        buf[32] = nl[0]; buf[33] = nl[1]; buf[34] = nl[2]; buf[35] = nl[3];
+        // data_len (u32 LE at offset 36)
+        let dl_val = data_len.min(AXFS_DATA_LEN);
+        let dl = (dl_val as u32).to_le_bytes();
+        buf[36] = dl[0]; buf[37] = dl[1]; buf[38] = dl[2]; buf[39] = dl[3];
+        // data (256B at offset 40)
+        let mut j = 0; while j < dl_val { buf[40 + j] = data[j]; j += 1; }
+        write_sector((AXFS_SECTOR_START + slot) as u64, &buf)
+    }
+}
+
+/// Read one AXFS file entry from sovereign disk sector.
+/// Returns (name_len, data_len) on success, None if slot is empty.
+#[allow(unused_unsafe)]
+pub fn axfs_read_file(slot: usize, name_out: &mut [u8; 32], data_out: &mut [u8; 256]) -> Option<(usize, usize)> {
+    if slot >= AXFS_SECTOR_COUNT { return None; }
+    #[cfg(not(target_arch = "aarch64"))]
+    { let _ = (name_out, data_out); return None; }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        if let Some(sec) = read_sector((AXFS_SECTOR_START + slot) as u64) {
+            let name_len = u32::from_le_bytes([sec[32], sec[33], sec[34], sec[35]]) as usize;
+            if name_len == 0 || name_len > AXFS_NAME_LEN { return None; }
+            let data_len = u32::from_le_bytes([sec[36], sec[37], sec[38], sec[39]]) as usize;
+            let data_len = data_len.min(AXFS_DATA_LEN);
+            let mut i = 0; while i < AXFS_NAME_LEN { name_out[i] = sec[i]; i += 1; }
+            let mut j = 0; while j < data_len { data_out[j] = sec[40 + j]; j += 1; }
+            Some((name_len, data_len))
+        } else {
+            None
+        }
     }
 }
 

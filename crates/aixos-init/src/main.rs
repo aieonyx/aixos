@@ -146,9 +146,11 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                 let name = &rest[..sp];
                 let data = &rest[sp + 1..];
                 if aixos_axfs::write(name, data) {
+                    // PL-56: sync to sovereign disk
+                    aixos_axfs::sync_to_disk();
                     "axfs: file written"
                 } else {
-                    "axfs: filesystem full (8 files max)"
+                    "axfs: filesystem full (16 files max)"
                 }
             }
         }
@@ -446,6 +448,11 @@ pub extern "C" fn aixos_main() -> ! {
         } else {
             uart_write("virtio-blk: no sovereign disk\n");
         }
+        // PL-56: load AXFS files from sovereign disk
+        if blk_live {
+            aixos_axfs::load_from_disk();
+            uart_write("AXFS: files loaded from disk\n");
+        }
     }
     // PL-51: restore persisted identity from EdisonDB + AXFS on boot
     unsafe {
@@ -466,6 +473,10 @@ pub extern "C" fn aixos_main() -> ! {
                 uart_write("boot: name restored\n");
             }
         }
+        // PL-54: sync restored identity into DESKTOP_STATE immediately
+        DESKTOP_STATE.tz_offset = TZ_OFFSET;
+        DESKTOP_STATE.user_name = core::slice::from_raw_parts(
+            USER_NAME_BUF.as_ptr(), USER_NAME_LEN);
     }
     aixos_edisondb::write("boot:node_id", aixos_identity::node_id(), aixos_edisondb::Tier::Critical);
     aixos_edisondb::log_event("boot:desktop_ready");
@@ -664,6 +675,29 @@ fn render_window_for_slot(i: usize) {
                   "Status: isolated  local only"],
                 w.w, w.h)
         }
+        6 => {
+            unsafe {
+                let count = aixos_axfs::count();
+                static mut FILE_NAME_PTRS: [(*const u8, usize); 16] = [(core::ptr::null(), 0); 16];
+                let n = count.min(16);
+                let mut fi = 0;
+                while fi < n {
+                    if let Some(f) = aixos_axfs::file_at(fi) {
+                        let nb = f.name_bytes();
+                        FILE_NAME_PTRS[fi] = (nb.as_ptr(), nb.len());
+                    }
+                    fi += 1;
+                }
+                let content = if FILES_VIEWING { &FILES_CONTENT_BUF[..FILES_CONTENT_LEN] } else { &[][..] };
+                aixos_gpu::desktop::set_window_pos(w.x, w.y);
+                aixos_gpu::desktop::render_window("AXFS - Files", &[], w.w, w.h);
+                aixos_gpu::desktop::render_files_window(
+                    w.x, w.y, w.w, w.h,
+                    &FILE_NAME_PTRS[..n], count, FILES_CURSOR,
+                    content, FILES_CONTENT_LEN, FILES_VIEWING,
+                );
+            }
+        }
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
@@ -798,7 +832,7 @@ fn handle_dock_click(x: i32, y: i32) {
             0 => 0, // Onyxia -> Node window (placeholder)
             1 => 0, // Browser -> Node window (placeholder)
             2 => 1, // Shell
-            3 => 2, // Files -> EDB store (closest match)
+            3 => 6, // Files -> AXFS Files window
             4 => 4, // EDB Browser
             5 => 3, // IAM -> Settings (placeholder)
             6 => 3, // Settings
@@ -818,7 +852,7 @@ fn handle_dock_click(x: i32, y: i32) {
                 }
                 // If no free slot, do nothing (all 5 windows open)
             }
-            if kind == 1 { WINDOW_FOCUSED = true; }
+            if kind == 1 || kind == 6 { WINDOW_FOCUSED = true; }
             if kind == 4 {
                 EDB_CURSOR = 0;
                 EDB_SCROLL = 0;
@@ -1192,7 +1226,7 @@ fn shell_loop(
 fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
     unsafe {
 
-        if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 1 {
+        if WINDOW_FOCUSED && wins()[ACTIVE_WIN].open && (wins()[ACTIVE_WIN].kind == 1 || wins()[ACTIVE_WIN].kind == 6) {
             handle_window_key(code, ch);
             return;
         }

@@ -8,3 +8,6 @@ license.workspace = true
 [lib]
 name = "aixos_axfs"
 path = "src/lib.rs"
+
+[dependencies]
+aixos-kernel = { path = "../aixos-kernel" }
