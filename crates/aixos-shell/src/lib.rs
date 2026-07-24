@@ -4,6 +4,7 @@
 
 use aixos_haniel::{render_sovereign_surface, render_text};
 use aixos_kernel::SovereignBoot;
+pub mod axon_interp;
 
 const BOOT_BANNER: &str = "aiXos Phoenix - Sovereign Stack Initializing...";
 

@@ -34,58 +34,14 @@ impl ShellBuf {
     fn as_slice(&self) -> &[u8] { &self.data[..self.len] }
 }
 
-fn hist_push(buf: &ShellBuf) {
-    unsafe {
-        if buf.len == 0 { return; }
-        let slot = HIST_COUNT % HIST_SIZE;
-        HIST[slot] = buf.data;
-        HIST_LEN[slot] = buf.len;
-        HIST_COUNT += 1;
-        HIST_NAV = 0;
-        TAB_ACTIVE = false;
-    }
-}
-fn hist_nav(buf: &mut ShellBuf, older: bool) {
-    unsafe {
-        let total = HIST_COUNT.min(HIST_SIZE);
-        if total == 0 { return; }
-        if older { if HIST_NAV < total { HIST_NAV += 1; } }
-        else { if HIST_NAV > 0 { HIST_NAV -= 1; } }
-        if HIST_NAV == 0 { buf.clear(); return; }
-        let idx = (HIST_COUNT.wrapping_sub(HIST_NAV)) % HIST_SIZE;
-        buf.data = HIST[idx];
-        buf.len = HIST_LEN[idx];
-    }
-}
-const CMDS: &[&[u8]] = &[b"help",b"clear",b"version",b"db",b"window",b"settings",
-    b"browse",b"close",b"reboot",b"tz",b"name",b"ls",b"cat",b"write",
-    b"awp",b"awp recv",b"mem",b"node-id",b"sovereignty",b"awp-status"];
-fn tab_complete(buf: &mut ShellBuf) {
-    unsafe {
-        let prefix = &buf.data[..buf.len];
-        let mut matches = [0usize; 20];
-        let mut mc = 0usize;
-        let mut ci = 0;
-        while ci < CMDS.len() {
-            let cmd = CMDS[ci];
-            if cmd.len() >= prefix.len() && &cmd[..prefix.len()] == prefix {
-                if mc < 20 { matches[mc] = ci; mc += 1; }
-            }
-            ci += 1;
-        }
-        if mc == 0 { TAB_ACTIVE = false; TAB_CYCLE = 0; return; }
-        let pick = if !TAB_ACTIVE { TAB_CYCLE = 0; 0 } else { let t = TAB_CYCLE % mc; TAB_CYCLE = (TAB_CYCLE+1)%mc; t };
-        TAB_ACTIVE = true;
-        let cmd = CMDS[matches[pick]];
-        let len = cmd.len().min(63);
-        let mut i = 0; while i < len { buf.data[i] = cmd[i]; i += 1; }
-        buf.len = len;
-    }
-}
+fn hist_push(buf: &ShellBuf) { unsafe { if buf.len == 0 { return; } let slot = HIST_COUNT % HIST_SIZE; HIST[slot] = buf.data; HIST_LEN[slot] = buf.len; HIST_COUNT += 1; HIST_NAV = 0; TAB_ACTIVE = false; } }
+fn hist_nav(buf: &mut ShellBuf, older: bool) { unsafe { let total = HIST_COUNT.min(HIST_SIZE); if total == 0 { return; } if older { if HIST_NAV < total { HIST_NAV += 1; } } else { if HIST_NAV > 0 { HIST_NAV -= 1; } } if HIST_NAV == 0 { buf.clear(); return; } let idx = (HIST_COUNT.wrapping_sub(HIST_NAV)) % HIST_SIZE; buf.data = HIST[idx]; buf.len = HIST_LEN[idx]; } }
+const CMDS: &[&[u8]] = &[b"help",b"clear",b"version",b"db",b"window",b"settings",b"browse",b"close",b"reboot",b"tz",b"name",b"ls",b"cat",b"write",b"awp",b"awp recv",b"mem",b"node-id",b"sovereignty",b"awp-status",b"run"];
+fn tab_complete(buf: &mut ShellBuf) { unsafe { let prefix = &buf.data[..buf.len]; let mut matches = [0usize;20]; let mut mc=0usize; let mut ci=0; while ci<CMDS.len() { let cmd=CMDS[ci]; if cmd.len()>=prefix.len() && &cmd[..prefix.len()]==prefix { if mc<20{matches[mc]=ci;mc+=1;} } ci+=1; } if mc==0{TAB_ACTIVE=false;TAB_CYCLE=0;return;} let pick=if !TAB_ACTIVE{TAB_CYCLE=0;0}else{let t=TAB_CYCLE%mc;TAB_CYCLE=(TAB_CYCLE+1)%mc;t}; TAB_ACTIVE=true; let cmd=CMDS[matches[pick]]; let len=cmd.len().min(63); let mut i=0; while i<len{buf.data[i]=cmd[i];i+=1;} buf.len=len; } }
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
     match cmd {
-        b"help" => "help clear version db window settings browse close reboot tz name ls cat write awp",
+        b"help" => "help clear version db window settings browse close reboot tz name ls cat write awp awp recv run",
         b"clear" => "axos> ",
         b"version" => "aiXos Phoenix v0.1.0 — Sovereign Stack",
         b"sovereignty" =>
@@ -201,6 +157,55 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                     "axfs: filesystem full (16 files max)"
                 }
             }
+        }
+        // PL-59.1: run <filename.ax> — execute AXON script from AXFS
+        cmd if cmd.starts_with(b"run ") && cmd.len() > 4 => {
+            let raw = &cmd[4..];
+            let fname = if let Some(sp) = raw.iter().position(|&b| b == b' ') { &raw[..sp] } else { raw };
+            if let Some(idx) = aixos_axfs::find(fname) {
+                if let Some(f) = aixos_axfs::file_at(idx) {
+                    let script = f.data_bytes();
+                    let result = aixos_shell::axon_interp::exec(
+                        script,
+                        unsafe { aixos_identity::node_id() },
+                        if aixos_net::virtio_net::is_live() {
+                            Some(|node_id: u64, payload: &[u8]| aixos_net::virtio_net::send_awp_frame(node_id, payload))
+                        } else { None },
+                    );
+                    unsafe {
+                        let out = result.as_str();
+                        let len = out.len().min(510);
+                        AXFS_BUF_LEN = len;
+                        let mut i = 0; while i < len { AXFS_BUF[i] = out[i]; i += 1; }
+                        core::str::from_utf8_unchecked(&AXFS_BUF[..AXFS_BUF_LEN])
+                    }
+                } else { "axon: read error" }
+            } else { "axon: file not found" }
+        }
+        // PL-58: awp recv
+        b"awp recv" => {
+            let got = aixos_net::virtio_net::poll_rx();
+            if got {
+                if let Some((node_id, payload)) = aixos_net::virtio_net::rx_log_entry(0) {
+                    unsafe {
+                        static mut RECV_BUF: [u8; 64] = [0u8; 64];
+                        let b = &mut *core::ptr::addr_of_mut!(RECV_BUF);
+                        let prefix = b"AWP RX: ";
+                        let mut pos = 0usize;
+                        let mut i = 0; while i < 8 { b[pos] = prefix[i]; pos += 1; i += 1; }
+                        let nid = (node_id as u32).to_be_bytes();
+                        let hex = b"0123456789ABCDEF";
+                        for byte in &nid {
+                            b[pos] = hex[(byte >> 4) as usize]; pos += 1;
+                            b[pos] = hex[(byte & 0xF) as usize]; pos += 1;
+                        }
+                        b[pos] = b' '; pos += 1;
+                        let plen = payload.len().min(20);
+                        let mut j = 0; while j < plen { b[pos] = payload[j]; pos += 1; j += 1; }
+                        core::str::from_utf8_unchecked(&b[..pos])
+                    }
+                } else { "AWP RX: frame (no AWP magic)" }
+            } else { "AWP RX: no frame" }
         }
         // PL-57: awp send <payload> — send AWP frame via virtio-net
         cmd if cmd.starts_with(b"awp ") && cmd.len() > 4 => {
