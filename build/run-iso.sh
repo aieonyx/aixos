@@ -14,7 +14,6 @@ fi
 
 echo "Booting aiXos Phoenix Lite..."
 qemu-system-aarch64 \
-  -netdev user,id=net0 -device virtio-net-device,netdev=net0 \
     -machine virt \
     -cpu cortex-a72 \
     -m 512M \
@@ -25,6 +24,10 @@ qemu-system-aarch64 \
     -device virtio-tablet-device \
     -device virtio-blk-device,drive=hd0 \
     -drive if=none,file="$ISO",format=raw,id=hd0,readonly=on \
+    -device virtio-blk-device,drive=hd1 \
+    -drive if=none,file="$REPO_ROOT/dist/aixos-sovereign.img",format=raw,id=hd1 \
+    -netdev user,id=net0 -device virtio-net-device,netdev=net0 \
     -display gtk \
     -serial pty \
+    -serial file:/tmp/aixos-serial.log \
     -no-reboot

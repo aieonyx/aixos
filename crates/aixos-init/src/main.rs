@@ -145,7 +145,9 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                 TZ_OFFSET = offset;
                 // store as u64 cast (i32 bit pattern)
                 aixos_edisondb::write("user:tz", offset as u64, aixos_edisondb::Tier::Personal);
-                "tz: offset stored in EdisonDB"
+                // PL-54: persist to sovereign disk
+                aixos_kernel::virtio_blk::store_write(b"user:tz", offset as u64);
+                "tz: offset stored"
             }
         }
         // PL-49: name command — set display name, stored in EdisonDB
@@ -168,6 +170,22 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                 aixos_edisondb::write("user:name", hash, aixos_edisondb::Tier::Personal);
                 // PL-51: also persist name bytes to AXFS for boot restore
                 aixos_axfs::write(b"sys:name", &USER_NAME_BUF[..len]);
+                // PL-54: persist name to sovereign disk in 8-byte chunks
+                {
+                    let mut chunk = [0u8; 8];
+                    let mut ci = 0; while ci < 8 && ci < len { chunk[ci] = USER_NAME_BUF[ci]; ci += 1; }
+                    aixos_kernel::virtio_blk::store_write(b"user:name:0", u64::from_le_bytes(chunk));
+                    let mut chunk = [0u8; 8];
+                    let mut ci = 0; while ci < 8 && 8+ci < len { chunk[ci] = USER_NAME_BUF[8+ci]; ci += 1; }
+                    aixos_kernel::virtio_blk::store_write(b"user:name:1", u64::from_le_bytes(chunk));
+                    let mut chunk = [0u8; 8];
+                    let mut ci = 0; while ci < 8 && 16+ci < len { chunk[ci] = USER_NAME_BUF[16+ci]; ci += 1; }
+                    aixos_kernel::virtio_blk::store_write(b"user:name:2", u64::from_le_bytes(chunk));
+                    let mut chunk = [0u8; 8];
+                    let mut ci = 0; while ci < 8 && 24+ci < len { chunk[ci] = USER_NAME_BUF[24+ci]; ci += 1; }
+                    aixos_kernel::virtio_blk::store_write(b"user:name:3", u64::from_le_bytes(chunk));
+                    aixos_kernel::virtio_blk::store_write(b"user:name:len", len as u64);
+                }
                 "name: identity stored"
             }
         }
@@ -339,6 +357,52 @@ pub extern "C" fn aixos_main() -> ! {
             uart_write("AWP: boot frame sent\n");
         } else {
             uart_write("virtio-net: not found\n");
+        }
+    }
+    // PL-54: init sovereign disk (virtio-blk hd1)
+    {
+        let blk_live = aixos_kernel::virtio_blk::init();
+        if blk_live {
+            uart_write("virtio-blk: sovereign disk live\n");
+            if !aixos_kernel::virtio_blk::store_valid() {
+                // First boot — format the store
+                aixos_kernel::virtio_blk::store_format(aixos_identity::node_id());
+                uart_write("sovereign store: formatted\n");
+            } else {
+                uart_write("sovereign store: valid\n");
+                // Restore tz from disk
+                if let Some(raw) = aixos_kernel::virtio_blk::store_read(b"user:tz") {
+                    unsafe { TZ_OFFSET = raw as i32; }
+                    uart_write("disk: tz restored\n");
+                }
+                // Restore name from disk
+                if let Some(raw) = aixos_kernel::virtio_blk::store_read(b"user:name:len") {
+                    unsafe {
+                        let len = (raw as usize).min(31);
+                        USER_NAME_LEN = len;
+                        // Read name bytes stored as 4 u64 chunks (32 bytes)
+                        if let Some(c0) = aixos_kernel::virtio_blk::store_read(b"user:name:0") {
+                            let b = c0.to_le_bytes();
+                            let mut i = 0; while i < 8 && i < len { USER_NAME_BUF[i] = b[i]; i += 1; }
+                        }
+                        if let Some(c1) = aixos_kernel::virtio_blk::store_read(b"user:name:1") {
+                            let b = c1.to_le_bytes();
+                            let mut i = 0; while i < 8 && 8+i < len { USER_NAME_BUF[8+i] = b[i]; i += 1; }
+                        }
+                        if let Some(c2) = aixos_kernel::virtio_blk::store_read(b"user:name:2") {
+                            let b = c2.to_le_bytes();
+                            let mut i = 0; while i < 8 && 16+i < len { USER_NAME_BUF[16+i] = b[i]; i += 1; }
+                        }
+                        if let Some(c3) = aixos_kernel::virtio_blk::store_read(b"user:name:3") {
+                            let b = c3.to_le_bytes();
+                            let mut i = 0; while i < 8 && 24+i < len { USER_NAME_BUF[24+i] = b[i]; i += 1; }
+                        }
+                    }
+                    uart_write("disk: name restored\n");
+                }
+            }
+        } else {
+            uart_write("virtio-blk: no sovereign disk\n");
         }
     }
     // PL-51: restore persisted identity from EdisonDB + AXFS on boot
