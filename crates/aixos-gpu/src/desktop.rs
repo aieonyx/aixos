@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_rect, draw_rounded_border};
-// cache_flush removed (unused)
+use crate::framebuffer::cache_flush;
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
 
 const DARK_BG:          u32 = 0x0D0B1F;
@@ -89,30 +89,85 @@ pub fn render_splash() {
 }
 
 pub fn render_desktop(state: &DesktopState) {
+    // ── PL-59.2: Rich gradient background ────────────────────────────────────
+    // Top: deep cosmic purple, bottom: near-black navy
+    // Horizontal sweep: subtle purple glow from center
     let mut by: u32 = 0;
     while by < 720 {
-        let t = (by * 255 / 720) as u8;
-        let r = 0x0Du8.saturating_add((((0x1Au32.saturating_sub(0x0D)) * t as u32) / 255) as u8);
-        let g = 0x0Bu8.saturating_add((((0x0Eu32.saturating_sub(0x0B)) * t as u32) / 255) as u8);
-        let b = 0x1Fu8.saturating_add((((0x2Eu32.saturating_sub(0x1F)) * t as u32) / 255) as u8);
-        let color = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
-        draw_hline(0, by, 1280, color);
+        let ty = by * 255 / 720;
+        // Vertical: dark purple top -> deep navy bottom
+        let r_base = 0x0Du32.saturating_sub(ty / 20);
+        let g_base = 0x08u32;
+        let b_base = 0x1Fu32.saturating_add(ty / 40);
+        // Horizontal sweep per row: brighter toward center x=640
+        let mut bx: u32 = 0;
+        while bx < 1280 {
+            let tx = if bx < 640 { bx * 255 / 640 } else { (1280 - bx) * 255 / 640 };
+            let glow = tx / 20; // subtle center brightening
+            let r = (r_base + glow / 3).min(0x18) as u8;
+            let g = (g_base + glow / 8).min(0x10) as u8;
+            let b = (b_base + glow).min(0x38) as u8;
+            let color = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
+            // Only draw on canvas (not over panels — save perf)
+            if bx >= 188 && bx <= 1092 {
+                use crate::framebuffer::{FRAMEBUFFER, WIDTH};
+                unsafe {
+                    let fb = core::ptr::addr_of_mut!(FRAMEBUFFER) as *mut u32;
+                    let offset = by as usize * WIDTH + bx as usize;
+                    core::ptr::write_volatile(fb.add(offset), color);
+                }
+            }
+            bx += 1;
+        }
         by += 1;
     }
-    let stars: [(u32, u32); 12] = [
-        (120,80),(340,40),(580,90),(700,50),(50,200),(750,300),
-        (200,420),(650,440),(900,150),(1100,80),(450,350),(1050,500),
+    // Fill panel areas with flat dark color (faster)
+    draw_rect(0, 0, 188, 720, 0x0A0816);
+    draw_rect(1092, 0, 188, 720, 0x0A0816);
+
+    // ── Stars: varied sizes and brightness ───────────────────────────────────
+    let stars: [(u32, u32, u32, u32); 24] = [
+        // (x, y, size, color)
+        (220,65,1,0x8888AA),(380,42,2,0xCCCCEE),(540,88,1,0x9999BB),
+        (720,55,2,0xDDDDFF),(850,30,1,0x7777AA),(960,75,1,0xAAAACC),
+        (290,180,1,0x6666AA),(480,210,2,0xBBBBDD),(600,155,1,0x8888BB),
+        (780,195,1,0x9999CC),(1020,120,2,0xCCCCEE),(1060,200,1,0x7777AA),
+        (240,340,1,0x6666AA),(500,380,1,0x8888CC),(730,360,2,0xAAAADD),
+        (880,310,1,0x7777BB),(1000,380,1,0x6666AA),(1050,450,2,0xBBBBCC),
+        (210,500,1,0x8888AA),(420,480,2,0xCCCCDD),(680,510,1,0x7777AA),
+        (820,490,1,0x9999BB),(1010,520,2,0xBBBBDD),(1070,560,1,0x8888AA),
     ];
-    for (sx, sy) in stars.iter() {
-        draw_rect(*sx, *sy, 2, 2, 0xCCCCDD);
+    for (sx, sy, sz, sc) in stars.iter() {
+        draw_rect(*sx, *sy, *sz, *sz, *sc);
     }
-    // ── PL-59.2: AIEONYX sovereign logo (32x32 pixel art) ──────────────────
-    // Blit the sovereign diamond logo at canvas center
-    let logo_x: u32 = 640 - crate::logo::LOGO_W / 2;
-    let logo_y: u32 = 374;
+    // Extra tiny pixel stars
+    let tiny: [(u32,u32); 16] = [
+        (310,95),(455,130),(615,200),(850,240),(930,180),(1045,310),
+        (270,265),(560,290),(700,400),(810,430),(950,390),(1060,470),
+        (230,440),(470,510),(740,540),(890,560),
+    ];
+    for (sx, sy) in tiny.iter() {
+        draw_rect(*sx, *sy, 1, 1, 0x555577);
+    }
+
+    // ── PL-59.2: 64x64 sovereign logo with ambient glow ──────────────────────
+    let logo_x: u32 = 640u32.saturating_sub(crate::logo::LOGO_W / 2);
+    let logo_y: u32 = 348;
+
+    // Draw glow halos behind logo (concentric dim circles)
+    let gc = logo_x + crate::logo::LOGO_W / 2;
+    let gy = logo_y + crate::logo::LOGO_H / 2;
+    blend_rect(gc.saturating_sub(48), gy.saturating_sub(48), 96, 96, 0x6B3FA0, 18);
+    blend_rect(gc.saturating_sub(36), gy.saturating_sub(36), 72, 72, 0x6B3FA0, 28);
+    blend_rect(gc.saturating_sub(24), gy.saturating_sub(24), 48, 48, 0x8840FF, 40);
+
+    // Blit the pixel logo on top
     crate::logo::blit_logo(logo_x, logo_y);
-    // AIEONYX wordmark below logo — dim, ambient
-    draw_str(612, logo_y + crate::logo::LOGO_H + 4, "AIEONYX", 0x2A2A4A);
+
+    // AIEONYX wordmark — brighter, 2x size
+    draw_str_2x(581, logo_y + crate::logo::LOGO_H + 8, "AIEONYX", 0x5A5ABB);
+    // Sovereign tagline — subtle
+    draw_str(496, logo_y + crate::logo::LOGO_H + 28, "Sovereign Digital Infrastructure", 0x2A2A4A);
 
     // Left glass panel
     draw_rounded_rect(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
