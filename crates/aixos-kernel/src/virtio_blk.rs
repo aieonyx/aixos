@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
 // PL-54: virtio-blk MMIO probe + sovereign store
-// DeepSeek fix: cache maintenance, physical addresses, FEATURES_OK
+// Fix: cache maintenance, physical addresses, FEATURES_OK
 #![allow(dead_code)]
 
 const MMIO_SCAN_BASE: usize = 0x0a00_0000;

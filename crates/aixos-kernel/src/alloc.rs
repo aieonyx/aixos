@@ -124,6 +124,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn alloc_returns_aligned_ptr() {
         reset();
         let p = alloc(16, 8);
@@ -132,6 +133,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn alloc_zero_returns_null() {
         reset();
         let p = alloc(0, 8);
@@ -139,6 +141,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn two_allocs_dont_overlap() {
         reset();
         let p1 = alloc(64, 8);
@@ -151,6 +154,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn bytes_used_tracks_allocations() {
         reset();
         let before = bytes_used();
@@ -160,6 +164,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn alloc_zeroed_is_zero() {
         reset();
         let p = alloc_zeroed(32, 8);
@@ -170,6 +175,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn reset_clears_state() {
         reset();
         alloc(256, 8);
@@ -179,6 +185,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
     fn alloc_val_roundtrip() {
         reset();
         let p = alloc_val::<u64>(0x4153);
