@@ -34,6 +34,54 @@ impl ShellBuf {
     fn as_slice(&self) -> &[u8] { &self.data[..self.len] }
 }
 
+fn hist_push(buf: &ShellBuf) {
+    unsafe {
+        if buf.len == 0 { return; }
+        let slot = HIST_COUNT % HIST_SIZE;
+        HIST[slot] = buf.data;
+        HIST_LEN[slot] = buf.len;
+        HIST_COUNT += 1;
+        HIST_NAV = 0;
+        TAB_ACTIVE = false;
+    }
+}
+fn hist_nav(buf: &mut ShellBuf, older: bool) {
+    unsafe {
+        let total = HIST_COUNT.min(HIST_SIZE);
+        if total == 0 { return; }
+        if older { if HIST_NAV < total { HIST_NAV += 1; } }
+        else { if HIST_NAV > 0 { HIST_NAV -= 1; } }
+        if HIST_NAV == 0 { buf.clear(); return; }
+        let idx = (HIST_COUNT.wrapping_sub(HIST_NAV)) % HIST_SIZE;
+        buf.data = HIST[idx];
+        buf.len = HIST_LEN[idx];
+    }
+}
+const CMDS: &[&[u8]] = &[b"help",b"clear",b"version",b"db",b"window",b"settings",
+    b"browse",b"close",b"reboot",b"tz",b"name",b"ls",b"cat",b"write",
+    b"awp",b"awp recv",b"mem",b"node-id",b"sovereignty",b"awp-status"];
+fn tab_complete(buf: &mut ShellBuf) {
+    unsafe {
+        let prefix = &buf.data[..buf.len];
+        let mut matches = [0usize; 20];
+        let mut mc = 0usize;
+        let mut ci = 0;
+        while ci < CMDS.len() {
+            let cmd = CMDS[ci];
+            if cmd.len() >= prefix.len() && &cmd[..prefix.len()] == prefix {
+                if mc < 20 { matches[mc] = ci; mc += 1; }
+            }
+            ci += 1;
+        }
+        if mc == 0 { TAB_ACTIVE = false; TAB_CYCLE = 0; return; }
+        let pick = if !TAB_ACTIVE { TAB_CYCLE = 0; 0 } else { let t = TAB_CYCLE % mc; TAB_CYCLE = (TAB_CYCLE+1)%mc; t };
+        TAB_ACTIVE = true;
+        let cmd = CMDS[matches[pick]];
+        let len = cmd.len().min(63);
+        let mut i = 0; while i < len { buf.data[i] = cmd[i]; i += 1; }
+        buf.len = len;
+    }
+}
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
     match cmd {
@@ -350,6 +398,13 @@ static mut WIN_BUF: ShellBuf = ShellBuf::new();
 static mut WINDOW_FOCUSED: bool = false;
 static mut WIN_OUTPUT: [&str; 8] = [""; 8];
 static mut WIN_OUTPUT_LEN: usize = 0;
+const HIST_SIZE: usize = 8;
+static mut HIST: [[u8; 64]; HIST_SIZE] = [[0u8; 64]; HIST_SIZE];
+static mut HIST_LEN: [usize; HIST_SIZE] = [0usize; HIST_SIZE];
+static mut HIST_COUNT: usize = 0;
+static mut HIST_NAV: usize = 0;
+static mut TAB_CYCLE: usize = 0;
+static mut TAB_ACTIVE: bool = false;
 static mut ECHO_BUFS: [[u8; 72]; 8] = [[0; 72]; 8];
 static mut ECHO_NEXT: usize = 0;
 // PL-50: AXFS output buffer — single slot, large enough for ls listing
@@ -986,11 +1041,18 @@ fn handle_window_key(code: u16, ch: Option<char>) {
         },
         14 => unsafe {
             win_buf().pop();
+            TAB_ACTIVE = false;
             render_all_windows();
         },
+        // PL-59: history navigation
+        103 => unsafe { hist_nav(win_buf(), true); render_all_windows(); },
+        108 => unsafe { hist_nav(win_buf(), false); render_all_windows(); },
+        // PL-59: tab completion
+        15 => unsafe { tab_complete(win_buf()); render_all_windows(); },
         _ => {
             if let Some(c) = ch {
                 win_buf().push(c as u8);
+                unsafe { TAB_ACTIVE = false; }
                 render_all_windows();
             }
         }
