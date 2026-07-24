@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_rect, draw_rounded_border};
-use crate::framebuffer::cache_flush;
+// cache_flush imported when needed
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
 
 const DARK_BG:          u32 = 0x0D0B1F;
