@@ -157,13 +157,11 @@ pub fn init() -> bool {
         let magic     = read32(base, OFF_MAGIC);
         let version   = read32(base, OFF_VERSION);
         let device_id = read32(base, OFF_DEVICE_ID);
-        if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID {
-            if setup(base) {
+        if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID && setup(base) {
                 BLK_BASE = base;
                 BLK_LIVE = true;
                 BLK_NEXT = 0; // reset descriptor index
                 return true;
-            }
         }
         BLK_LIVE = false;
         false
@@ -258,18 +256,18 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
         flags: data_flags, next: d2 as u16,
     };
     ring.desc[d2] = VirtqDesc {
-        addr:  virt_to_phys(core::ptr::addr_of!(BLK_STATUS) as *const u8),
+        addr:  virt_to_phys(core::ptr::addr_of!(BLK_STATUS).cast::<u8>()),
         len:   1, flags: 0x2, next: 0,
     };
 
     // Cache maintenance
-    dc_clean(ring as *const _ as *const u8, core::mem::size_of::<BlkRing>());
-    dc_clean(core::ptr::addr_of!(BLK_REQ) as *const u8,
+    dc_clean(ring as *mut BlkRing as *const u8, core::mem::size_of::<BlkRing>());
+    dc_clean(core::ptr::addr_of!(BLK_REQ).cast::<u8>(),
              core::mem::size_of::<BlkReqHdr>());
     if is_write {
-        dc_clean(core::ptr::addr_of!(BLK_BUF) as *const u8, SECTOR_SIZE);
+        dc_clean(core::ptr::addr_of!(BLK_BUF).cast::<u8>(), SECTOR_SIZE);
     }
-    dc_invalidate(core::ptr::addr_of!(BLK_STATUS) as *const u8, 1);
+    dc_invalidate(core::ptr::addr_of!(BLK_STATUS).cast::<u8>(), 1);
 
     let slot = (ring.avail.idx as usize) % QUEUE_SIZE;
     ring.avail.ring[slot] = d0 as u16;
@@ -282,7 +280,7 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     // Poll completion with cache invalidation
     let mut timeout = 0u32;
     loop {
-        dc_invalidate(core::ptr::addr_of!(BLK_STATUS) as *const u8, 1);
+        dc_invalidate(core::ptr::addr_of!(BLK_STATUS).cast::<u8>(), 1);
         let status = core::ptr::read_volatile(core::ptr::addr_of!(BLK_STATUS));
         if status != 0xFF { break; }
         if timeout >= 2_000_000 { break; }
@@ -296,18 +294,20 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     BLK_NEXT = BLK_NEXT.wrapping_add(3);
 }
 
+#[allow(unused_unsafe)]
 pub fn store_valid() -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     return false;
     #[cfg(target_arch = "aarch64")]
     unsafe {
         if let Some(sec) = read_sector(0) {
-            return &sec[0..8] == &SOV_MAGIC;
+            return sec[0..8] == SOV_MAGIC;
         }
         false
     }
 }
 
+#[allow(unused_unsafe)]
 pub fn store_format(node_id: u64) -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = node_id; return false; }
@@ -321,6 +321,7 @@ pub fn store_format(node_id: u64) -> bool {
     }
 }
 
+#[allow(unused_unsafe)]
 pub fn store_read(key: &[u8]) -> Option<u64> {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = key; return None; }
@@ -350,6 +351,7 @@ pub fn store_read(key: &[u8]) -> Option<u64> {
     }
 }
 
+#[allow(unused_unsafe)]
 pub fn store_write(key: &[u8], value: u64) -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = (key, value); return false; }

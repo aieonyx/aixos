@@ -44,7 +44,40 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
             "S4+i: Security Sovereignty Simplicity Speed +Intelligence",
         b"node-id" => "node-id: 0x0000000000000000 [ARPi pending]",
         b"awp-status" => "AWP: stub — not yet on packet path",
-        b"mem" => "RAM: 512M  FB: 4M@0x44000000  Stack: 64K",
+        b"mem" => {
+            // PL-55: show real heap stats
+            unsafe {
+                static mut MEM_BUF: [u8; 80] = [0u8; 80];
+                let used = aixos_kernel::alloc::bytes_used();
+                let free = aixos_kernel::alloc::bytes_free();
+                let cnt  = aixos_kernel::alloc::alloc_count();
+                let b = &mut *core::ptr::addr_of_mut!(MEM_BUF);
+                // Format: "RAM:512M Heap:used/free allocs:N"
+                let msg = b"Heap: ";
+                let mut pos = 0usize;
+                let mut i = 0; while i < 6 { b[pos] = msg[i]; pos += 1; i += 1; }
+                // used KB
+                let uk = used / 1024;
+                if uk == 0 { b[pos] = b'0'; pos += 1; }
+                else {
+                    let mut tmp = [0u8;8]; let mut tl = 0; let mut n = uk;
+                    while n > 0 { tmp[tl] = b'0' + (n%10) as u8; tl+=1; n/=10; }
+                    let mut ti = tl; while ti > 0 { ti-=1; b[pos]=tmp[ti]; pos+=1; }
+                }
+                let s = b"KB used  Free:"; let mut i=0; while i<14{b[pos]=s[i];pos+=1;i+=1;}
+                let fk = free / 1024;
+                let mut tmp=[0u8;8];let mut tl=0;let mut n=fk;
+                while n>0{tmp[tl]=b'0'+(n%10)as u8;tl+=1;n/=10;}
+                if tl==0{b[pos]=b'0';pos+=1;}
+                else{let mut ti=tl;while ti>0{ti-=1;b[pos]=tmp[ti];pos+=1;}}
+                let s2=b"KB  Allocs:";let mut i=0;while i<11{b[pos]=s2[i];pos+=1;i+=1;}
+                let mut tmp=[0u8;8];let mut tl=0;let mut n=cnt;
+                while n>0{tmp[tl]=b'0'+(n%10)as u8;tl+=1;n/=10;}
+                if tl==0{b[pos]=b'0';pos+=1;}
+                else{let mut ti=tl;while ti>0{ti-=1;b[pos]=tmp[ti];pos+=1;}}
+                core::str::from_utf8_unchecked(&b[..pos])
+            }
+        }
         b"reboot" => {
             uart_write("axos> reboot\n");
             loop {}
@@ -345,6 +378,15 @@ pub extern "C" fn aixos_main() -> ! {
     aixos_edisondb::init();
     // PL-50: AXFS init — seeds readme.txt
     aixos_axfs::init();
+    // PL-55: sovereign heap init
+    uart_write("heap: init ");
+    {
+        let free_kb = aixos_kernel::alloc::bytes_free() / 1024;
+        // Just log — bump allocator needs no explicit init
+        uart_write("sovereign heap ready\n");
+        // Make a boot allocation as proof
+        let _proof = aixos_kernel::alloc::alloc_val::<u64>(0x4153u64);
+    }
     // PL-53: probe virtio-net and send boot AWP frame
     {
         let net_live = aixos_net::virtio_net::init();
@@ -364,9 +406,7 @@ pub extern "C" fn aixos_main() -> ! {
         let blk_live = aixos_kernel::virtio_blk::init();
         if blk_live {
             uart_write("virtio-blk: sovereign disk live\n");
-            let valid = aixos_kernel::virtio_blk::store_valid();
-            if valid { uart_write("store: valid\n"); } else { uart_write("store: INVALID\n"); }
-            if !valid {
+            if !aixos_kernel::virtio_blk::store_valid() {
                 // First boot — format the store
                 aixos_kernel::virtio_blk::store_format(aixos_identity::node_id());
                 uart_write("sovereign store: formatted\n");
@@ -405,12 +445,6 @@ pub extern "C" fn aixos_main() -> ! {
             }
         } else {
             uart_write("virtio-blk: no sovereign disk\n");
-        }
-        // PL-54: sync restored identity into DESKTOP_STATE immediately
-        unsafe {
-            DESKTOP_STATE.tz_offset = TZ_OFFSET;
-            DESKTOP_STATE.user_name = core::slice::from_raw_parts(
-                USER_NAME_BUF.as_ptr(), USER_NAME_LEN);
         }
     }
     // PL-51: restore persisted identity from EdisonDB + AXFS on boot

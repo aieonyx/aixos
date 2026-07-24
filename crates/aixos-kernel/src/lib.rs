@@ -7,6 +7,7 @@ pub const AXON_PROOF: u32 = 0x4153;
 
 pub mod boot;
 pub mod virtio_blk;
+pub mod alloc;
 
 /// Boot-sequence contract implemented by each sovereign PD stub.
 pub trait SovereignBoot {

@@ -36,14 +36,16 @@ pub fn init() {
 pub fn write(key: &'static str, value: u64, tier: Tier) -> bool {
     unsafe {
         let len = STORE_LEN;
-        for i in 0..len {
-            if let Some(ref mut e) = STORE[i] {
+        let mut fi = 0;
+        while fi < len {
+            if let Some(ref mut e) = STORE[fi] {
                 if e.key == key {
                     e.value = value;
                     e.tier = tier;
                     return true;
                 }
             }
+            fi += 1;
         }
         if len >= MAX_ENTRIES {
             return false;
@@ -56,12 +58,14 @@ pub fn write(key: &'static str, value: u64, tier: Tier) -> bool {
 
 pub fn read(key: &'static str) -> Option<u64> {
     unsafe {
-        for i in 0..STORE_LEN {
-            if let Some(ref e) = STORE[i] {
+        let mut fi = 0;
+        while fi < STORE_LEN {
+            if let Some(ref e) = STORE[fi] {
                 if e.key == key {
                     return Some(e.value);
                 }
             }
+            fi += 1;
         }
         None
     }

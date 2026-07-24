@@ -70,13 +70,15 @@ pub fn write(name: &[u8], data: &[u8]) -> bool {
     unsafe {
         let fc = FILE_COUNT;
         // Upsert: check if name already exists
-        for i in 0..fc {
-            if FILES[i].name_bytes() == &name[..nlen] {
-                FILES[i].data_len = dlen;
+        let mut fi = 0;
+        while fi < fc {
+            if FILES[fi].name_bytes() == &name[..nlen] {
+                FILES[fi].data_len = dlen;
                 let mut j = 0;
-                while j < dlen { FILES[i].data[j] = data[j]; j += 1; }
+                while j < dlen { FILES[fi].data[j] = data[j]; j += 1; }
                 return true;
             }
+            fi += 1;
         }
         // Append
         if fc >= MAX_FILES {
@@ -106,10 +108,12 @@ pub fn file_at(i: usize) -> Option<&'static AxFile> {
 /// Find file by name, return index or None.
 pub fn find(name: &[u8]) -> Option<usize> {
     unsafe {
-        for i in 0..FILE_COUNT {
-            if FILES[i].name_bytes() == name {
-                return Some(i);
+        let mut fi = 0;
+        while fi < FILE_COUNT {
+            if FILES[fi].name_bytes() == name {
+                return Some(fi);
             }
+            fi += 1;
         }
         None
     }
