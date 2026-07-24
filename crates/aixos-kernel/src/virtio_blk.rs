@@ -216,7 +216,7 @@ unsafe fn setup(base: usize) -> bool {
     let qsize = (QUEUE_SIZE as u32).min(qmax);
     write32(base, OFF_QUEUE_NUM, qsize);
     write32(base, OFF_QUEUE_ALIGN, 4096);
-    let ring_ptr = core::ptr::addr_of_mut!(BLK_RING) as *const u8;
+    let ring_ptr = core::ptr::addr_of_mut!(BLK_RING).cast::<u8>();
     let pfn = (virt_to_phys(ring_ptr) >> 12) as u32;
     write32(base, OFF_QUEUE_PFN, pfn);
     // Cache-clean ring before enabling
@@ -271,28 +271,28 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     let data_flags: u16 = if is_write { 0x1 } else { 0x1 | 0x2 };
 
     ring.desc[d0] = VirtqDesc {
-        addr:  virt_to_phys(core::ptr::addr_of!(BLK_REQ) as *const u8),
+        addr:  virt_to_phys(core::ptr::addr_of!(BLK_REQ).cast::<u8>()),
         len:   core::mem::size_of::<BlkReqHdr>() as u32,
         flags: 0x1, next: d1 as u16,
     };
     ring.desc[d1] = VirtqDesc {
-        addr:  virt_to_phys(core::ptr::addr_of!(BLK_BUF) as *const u8),
+        addr:  virt_to_phys(core::ptr::addr_of!(BLK_BUF).cast::<u8>()),
         len:   SECTOR_SIZE as u32,
         flags: data_flags, next: d2 as u16,
     };
     ring.desc[d2] = VirtqDesc {
-        addr:  virt_to_phys(core::ptr::addr_of!(BLK_STATUS) as *const u8),
+        addr:  virt_to_phys(core::ptr::addr_of!(BLK_STATUS).cast::<u8>()),
         len:   1, flags: 0x2, next: 0,
     };
 
     // Cache maintenance
-    dc_clean(ring as *const _ as *const u8, core::mem::size_of::<BlkRing>());
-    dc_clean(core::ptr::addr_of!(BLK_REQ) as *const u8,
+    dc_clean((ring as *mut BlkRing).cast::<u8>(), core::mem::size_of::<BlkRing>());
+    dc_clean(core::ptr::addr_of!(BLK_REQ).cast::<u8>(),
              core::mem::size_of::<BlkReqHdr>());
     if is_write {
-        dc_clean(core::ptr::addr_of!(BLK_BUF) as *const u8, SECTOR_SIZE);
+        dc_clean(core::ptr::addr_of!(BLK_BUF).cast::<u8>(), SECTOR_SIZE);
     }
-    dc_invalidate(core::ptr::addr_of!(BLK_STATUS) as *const u8, 1);
+    dc_invalidate(core::ptr::addr_of!(BLK_STATUS).cast::<u8>(), 1);
 
     let slot = (ring.avail.idx as usize) % QUEUE_SIZE;
     ring.avail.ring[slot] = d0 as u16;
@@ -305,7 +305,7 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     // Poll completion with cache invalidation
     let mut timeout = 0u32;
     loop {
-        dc_invalidate(core::ptr::addr_of!(BLK_STATUS) as *const u8, 1);
+        dc_invalidate(core::ptr::addr_of!(BLK_STATUS).cast::<u8>(), 1);
         let status = core::ptr::read_volatile(core::ptr::addr_of!(BLK_STATUS));
         if status != 0xFF { break; }
         if timeout >= 2_000_000 { break; }
@@ -313,7 +313,7 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     }
 
     if !is_write {
-        dc_invalidate(core::ptr::addr_of!(BLK_BUF) as *const u8, SECTOR_SIZE);
+        dc_invalidate(core::ptr::addr_of!(BLK_BUF).cast::<u8>(), SECTOR_SIZE);
     }
 
     BLK_NEXT = BLK_NEXT.wrapping_add(3);
