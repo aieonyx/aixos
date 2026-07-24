@@ -364,7 +364,9 @@ pub extern "C" fn aixos_main() -> ! {
         let blk_live = aixos_kernel::virtio_blk::init();
         if blk_live {
             uart_write("virtio-blk: sovereign disk live\n");
-            if !aixos_kernel::virtio_blk::store_valid() {
+            let valid = aixos_kernel::virtio_blk::store_valid();
+            if valid { uart_write("store: valid\n"); } else { uart_write("store: INVALID\n"); }
+            if !valid {
                 // First boot — format the store
                 aixos_kernel::virtio_blk::store_format(aixos_identity::node_id());
                 uart_write("sovereign store: formatted\n");
@@ -403,6 +405,12 @@ pub extern "C" fn aixos_main() -> ! {
             }
         } else {
             uart_write("virtio-blk: no sovereign disk\n");
+        }
+        // PL-54: sync restored identity into DESKTOP_STATE immediately
+        unsafe {
+            DESKTOP_STATE.tz_offset = TZ_OFFSET;
+            DESKTOP_STATE.user_name = core::slice::from_raw_parts(
+                USER_NAME_BUF.as_ptr(), USER_NAME_LEN);
         }
     }
     // PL-51: restore persisted identity from EdisonDB + AXFS on boot
