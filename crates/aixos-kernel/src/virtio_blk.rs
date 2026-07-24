@@ -162,8 +162,7 @@ pub fn init() -> bool {
             let magic     = read32(base, OFF_MAGIC);
             let version   = read32(base, OFF_VERSION);
             let device_id = read32(base, OFF_DEVICE_ID);
-            if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID {
-                if setup(base) {
+            if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID && setup(base) {
                     BLK_BASE = base;
                     BLK_LIVE = true;
                     // Check if this is the sovereign disk
@@ -184,7 +183,6 @@ pub fn init() -> bool {
                     // Not sovereign — reset and try next
                     write32(base, OFF_STATUS, 0);
                     BLK_LIVE = false;
-                }
             }
             slot += 1;
         }
