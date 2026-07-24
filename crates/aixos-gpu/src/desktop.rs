@@ -2,39 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_rect, draw_rounded_border};
-// cache_flush imported when needed
+// cache_flush removed (unused)
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
 
 const DARK_BG:          u32 = 0x0D0B1F;
-#[allow(dead_code)]
 const DARK_BG2:         u32 = 0x1A0E2E;
 const PANEL_BG:         u32 = 0x141428;
 const PANEL_BORDER:     u32 = 0x2A2A4A;
 const TEXT_WHITE:       u32 = 0xEEEEFF;
-#[allow(dead_code)]
 const TEXT_DIM:         u32 = 0x666688;
-#[allow(dead_code)]
 const TOP_BAR:          u32 = 0x080818;
 const DOCK_BG:          u32 = 0x0D0D20;
-#[allow(dead_code)]
 const SOVEREIGN_PURPLE: u32 = 0x7B4FDB;
-#[allow(dead_code)]
 const ACCENT_TEAL:      u32 = 0x1BAF7A;
 const ACCENT_AMBER:     u32 = 0xD4A017;
 const SETTINGS_BLUE:    u32 = 0x1B7FC4;
 const BROWSE_GREEN:     u32 = 0x2A7A4A;
 const TOP_BAR_H:  u32 = 38;
-#[allow(dead_code)]
 const DOCK_Y:     u32 = 676;
 const DOCK_H:     u32 = 44;
 const PANEL_W:    u32 = 180;
-#[allow(dead_code)]
 const TASKBAR_Y:  u32 = 676;
-#[allow(dead_code)]
 const TASKBAR_H:  u32 = 44;
-#[allow(dead_code)]
 const CANVAS_Y:   u32 = 38;
-#[allow(dead_code)]
 const CANVAS_H:   u32 = 638;
 const GLASS_PANEL: u32 = 0x0F0D22;
 const GLASS_BORDER: u32 = 0x2A2840;
@@ -116,30 +106,13 @@ pub fn render_desktop(state: &DesktopState) {
     for (sx, sy) in stars.iter() {
         draw_rect(*sx, *sy, 2, 2, 0xCCCCDD);
     }
-    // ── Center canvas sovereign anchor (PL-47) ──────────────────────────────
-    // Small diamond at canvas center (between left panel x=188 and right panel x=1092)
-    // Center: x=640, y=390 — subtle, dim, sovereign presence
-    let cx: u32 = 640;
-    let cy: u32 = 390;
-    let r: u32 = 20; // radius
-    let mut di: u32 = 0;
-    while di <= r {
-        let dw = di * 2 + 1;
-        let dx = cx.saturating_sub(di);
-        let dy = cy.saturating_sub(r).saturating_add(di);
-        draw_hline(dx, dy, dw, 0x2A1A4A);
-        di += 1;
-    }
-    let mut di: u32 = 1;
-    while di <= r {
-        let dw = (r - di) * 2 + 1;
-        let dx = cx.saturating_sub(r - di);
-        let dy = cy + di;
-        draw_hline(dx, dy, dw, 0x2A1A4A);
-        di += 1;
-    }
-    // AIEONYX wordmark below diamond — very dim, ambient
-    draw_str(612, cy + r + 8, "AIEONYX", 0x1A1A2A);
+    // ── PL-59.2: AIEONYX sovereign logo (32x32 pixel art) ──────────────────
+    // Blit the sovereign diamond logo at canvas center
+    let logo_x: u32 = 640 - crate::logo::LOGO_W / 2;
+    let logo_y: u32 = 374;
+    crate::logo::blit_logo(logo_x, logo_y);
+    // AIEONYX wordmark below logo — dim, ambient
+    draw_str(612, logo_y + crate::logo::LOGO_H + 4, "AIEONYX", 0x2A2A4A);
 
     // Left glass panel
     draw_rounded_rect(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
@@ -367,25 +340,17 @@ pub fn render_command_result(msg: &str) {
 const TEXT_DIM_2: u32 = 0x666688;
 
 // ── PL-20: Sovereign Window Primitive ────────────────────────────────────────
-#[allow(dead_code)]
 const WIN_X: u32 = 340;
-#[allow(dead_code)]
 const WIN_Y: u32 = 110;
 const WIN_W: u32 = 580;
 const WIN_H: u32 = 300;
 const WIN_TITLE_H: u32 = 24;
 const WIN_BG:    u32 = 0x0D0D22;
-#[allow(dead_code)]
 const WIN_TITLE: u32 = 0x1A1A3A;
-#[allow(dead_code)]
 const GLASS_HI:  u32 = 0x3A3A5A;
-#[allow(dead_code)]
 const GLASS_MID: u32 = 0x1E1E38;
-#[allow(dead_code)]
 const GLASS_LOW: u32 = 0x111128;
-#[allow(dead_code)]
 const SHADOW:    u32 = 0x000008;
-#[allow(dead_code)]
 const CLOSE_RED: u32 = 0xC0392B;
 
 static mut CUR_WIN_X: i32 = 200;
@@ -417,6 +382,7 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
     blend_rect(wx + 3, wy + 3, w + 2, h + 2, SHADOW, 100);
+    draw_rounded_border(wx.saturating_sub(1), wy.saturating_sub(1), w + 2, h + 2, 6, ACCENT_TEAL);
     draw_rounded_border(wx, wy, w, h, 5, 0x2A1A4A);
     let band = WIN_TITLE_H / 4;
     draw_rect(wx, wy,            w, band,                   GLASS_HI);
@@ -445,11 +411,12 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_str(cx + 2, cy + 1, "x", TEXT_WHITE);
     draw_hline(wx, wy + WIN_TITLE_H, w, ACCENT_TEAL);
     draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
-
     blend_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, SOVEREIGN_PURPLE, 12);
+    let mut row = 0u32;
     let max_rows = if h > WIN_TITLE_H + 20 { (h - WIN_TITLE_H - 20) / 18 } else { 0 };
-    for (row, line) in lines.iter().take(max_rows as usize).enumerate() {
-        draw_str_clipped(wx + 12, wy + WIN_TITLE_H + 12 + row as u32 * 18, line, TEXT_WHITE, wx + w - 8);
+    for line in lines.iter().take(max_rows as usize) {
+        draw_str_clipped(wx + 12, wy + WIN_TITLE_H + 12 + row * 18, line, TEXT_WHITE, wx + w - 8);
+        row += 1;
     }
     draw_rect(wx + w - 12, wy + h - 12, 12, 12, ACCENT_TEAL);
     blend_rect(wx + w - 12, wy + h - 12, 12, 6, 0xFFFFFF, 30);
@@ -500,66 +467,80 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
 
 // ── PL-52: AXFS Files Window ─────────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
+/// Render the sovereign AXFS file browser window.
+/// mode=0: file list  mode=1: file content view
 pub fn render_files_window(
     wx: i32, wy: i32, w: u32, h: u32,
+    // file list: names as (ptr, len) pairs
     file_names: &[(*const u8, usize)],
     file_count: usize,
     cursor: usize,
+    // content view
     content: &[u8],
     content_len: usize,
     viewing: bool,
 ) {
     let wx_u = wx as u32;
     let wy_u = wy as u32;
-    // Content area starts below title bar (render_window already drew chrome)
-    let start_y = wy_u + WIN_TITLE_H + 2;
-    let row_h: u32 = 16;
-    let max_rows = (h.saturating_sub(WIN_TITLE_H + 20)) / row_h;
+    // Window chrome
+    draw_rect(wx_u, wy_u, w, h, 0x0A0818);
+    draw_border(wx_u, wy_u, w, h, GLASS_BORDER);
+    draw_rect(wx_u, wy_u, w, 20, GLASS_PANEL);
+    draw_hline(wx_u, wy_u + 20, w, SOVEREIGN_PURPLE);
+    // Title
+    if viewing {
+        draw_str(wx_u + 8, wy_u + 14, "AXFS - File View", 0x888899);
+    } else {
+        draw_str(wx_u + 8, wy_u + 14, "AXFS - Files", 0x888899);
+        draw_str(wx_u + w - 120, wy_u + 14, "[Enter=open Esc=back]", 0x44446A);
+    }
+
+    let row_h: u32 = 18;
+    let start_y = wy_u + 28;
 
     if viewing {
-        // Draw "< back" hint in title area
-        draw_str(wx_u + w - 100, wy_u + 14, "Esc=back", 0x44446A);
-        // Render content line by line
+        // Render file content line by line
         let mut line_start = 0usize;
         let mut row = 0u32;
+        let max_rows = (h.saturating_sub(36)) / row_h;
         let mut i = 0;
         while i <= content_len && row < max_rows {
-            if i == content_len || content[i] == b'\n' {
+            let end = i == content_len || content[i] == b'\n';
+            if end {
                 let line = &content[line_start..i];
                 if let Ok(s) = core::str::from_utf8(line) {
-                    draw_str_clipped(wx_u + 8, start_y + row * row_h + 4, s, TEXT_WHITE, wx_u + w - 8);
+                    draw_str_clipped(wx_u + 8, start_y + row * row_h, s, TEXT_WHITE, wx_u + w - 8);
                 }
                 row += 1;
                 line_start = i + 1;
             }
             i += 1;
         }
-        draw_str(wx_u + 8, wy_u + h - 12, "Esc: back to list", 0x44446A);
+        draw_str(wx_u + 8, wy_u + h - 14, "Esc: back to list", 0x44446A);
     } else {
-        // Hint in title area
-        // hints shown at bottom only
         // Render file list
+        let max_rows = (h.saturating_sub(36)) / row_h;
         let mut fi = 0usize;
         while fi < file_count && (fi as u32) < max_rows {
             let (ptr, len) = file_names[fi];
             let row_y = start_y + fi as u32 * row_h;
-            let is_sel = fi == cursor;
-            if is_sel {
-                draw_rect(wx_u + 2, row_y, w - 4, row_h, SOVEREIGN_PURPLE);
+            let is_selected = fi == cursor;
+            if is_selected {
+                draw_rect(wx_u + 4, row_y - 2, w - 8, row_h, SOVEREIGN_PURPLE);
             }
-            let col = if is_sel { TEXT_WHITE } else { 0x888899 };
-            draw_str(wx_u + 8, row_y + 4, if is_sel { ">" } else { " " }, ACCENT_TEAL);
+            let col = if is_selected { TEXT_WHITE } else { 0x888899 };
+            draw_str(wx_u + 12, row_y + 10, if is_selected { ">" } else { " " }, ACCENT_TEAL);
+            // Draw filename from raw ptr
             let name_bytes = unsafe { core::slice::from_raw_parts(ptr, len) };
             if let Ok(s) = core::str::from_utf8(name_bytes) {
-                draw_str_clipped(wx_u + 20, row_y + 4, s, col, wx_u + w - 8);
+                draw_str_clipped(wx_u + 24, row_y + 10, s, col, wx_u + w - 8);
             }
             fi += 1;
         }
         if file_count == 0 {
-            draw_str(wx_u + 8, start_y + 4, "[empty filesystem]", 0x44446A);
+            draw_str(wx_u + 12, start_y + 10, "[empty filesystem]", 0x44446A);
         }
-        draw_str(wx_u + 8, wy_u + h - 12, "arrows: navigate  Enter: open  Esc: close", 0x44446A);
+        draw_str(wx_u + 8, wy_u + h - 14, "arrows: navigate  Enter: open  Esc: close", 0x44446A);
     }
 }
 
@@ -571,7 +552,6 @@ pub struct EdbEntry {
     pub value: u64,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn render_edb_browser(
     wx: i32, wy: i32, w: u32, h: u32,
     entries: &[EdbEntry],

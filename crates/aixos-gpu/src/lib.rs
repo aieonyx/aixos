@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), no_std)]
 
 pub mod commands;
+pub mod logo;
 pub mod cursor;
 pub mod draw;
 pub mod desktop;
@@ -258,3 +259,5 @@ pub fn read_status() -> u32 {
 }
 #[cfg(test)]
 pub fn read_status() -> u32 { 0 }
+
+pub use logo::{blit_logo, blit_raw, LOGO_W, LOGO_H};
