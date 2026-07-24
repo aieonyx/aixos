@@ -325,7 +325,7 @@ pub fn store_valid() -> bool {
     #[cfg(target_arch = "aarch64")]
     unsafe {
         if let Some(sec) = read_sector(0) {
-            return &sec[0..8] == &SOV_MAGIC;
+            return sec[0..8] == SOV_MAGIC;
         }
         false
     }
