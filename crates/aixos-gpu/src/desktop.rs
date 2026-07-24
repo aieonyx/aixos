@@ -6,25 +6,35 @@ use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_r
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
 
 const DARK_BG:          u32 = 0x0D0B1F;
+#[allow(dead_code)]
 const DARK_BG2:         u32 = 0x1A0E2E;
 const PANEL_BG:         u32 = 0x141428;
 const PANEL_BORDER:     u32 = 0x2A2A4A;
 const TEXT_WHITE:       u32 = 0xEEEEFF;
+#[allow(dead_code)]
 const TEXT_DIM:         u32 = 0x666688;
+#[allow(dead_code)]
 const TOP_BAR:          u32 = 0x080818;
 const DOCK_BG:          u32 = 0x0D0D20;
+#[allow(dead_code)]
 const SOVEREIGN_PURPLE: u32 = 0x7B4FDB;
+#[allow(dead_code)]
 const ACCENT_TEAL:      u32 = 0x1BAF7A;
 const ACCENT_AMBER:     u32 = 0xD4A017;
 const SETTINGS_BLUE:    u32 = 0x1B7FC4;
 const BROWSE_GREEN:     u32 = 0x2A7A4A;
 const TOP_BAR_H:  u32 = 38;
+#[allow(dead_code)]
 const DOCK_Y:     u32 = 676;
 const DOCK_H:     u32 = 44;
 const PANEL_W:    u32 = 180;
+#[allow(dead_code)]
 const TASKBAR_Y:  u32 = 676;
+#[allow(dead_code)]
 const TASKBAR_H:  u32 = 44;
+#[allow(dead_code)]
 const CANVAS_Y:   u32 = 38;
+#[allow(dead_code)]
 const CANVAS_H:   u32 = 638;
 const GLASS_PANEL: u32 = 0x0F0D22;
 const GLASS_BORDER: u32 = 0x2A2840;
@@ -357,17 +367,25 @@ pub fn render_command_result(msg: &str) {
 const TEXT_DIM_2: u32 = 0x666688;
 
 // ── PL-20: Sovereign Window Primitive ────────────────────────────────────────
+#[allow(dead_code)]
 const WIN_X: u32 = 340;
+#[allow(dead_code)]
 const WIN_Y: u32 = 110;
 const WIN_W: u32 = 580;
 const WIN_H: u32 = 300;
 const WIN_TITLE_H: u32 = 24;
 const WIN_BG:    u32 = 0x0D0D22;
+#[allow(dead_code)]
 const WIN_TITLE: u32 = 0x1A1A3A;
+#[allow(dead_code)]
 const GLASS_HI:  u32 = 0x3A3A5A;
+#[allow(dead_code)]
 const GLASS_MID: u32 = 0x1E1E38;
+#[allow(dead_code)]
 const GLASS_LOW: u32 = 0x111128;
+#[allow(dead_code)]
 const SHADOW:    u32 = 0x000008;
+#[allow(dead_code)]
 const CLOSE_RED: u32 = 0xC0392B;
 
 static mut CUR_WIN_X: i32 = 200;
@@ -429,11 +447,9 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
 
     blend_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, SOVEREIGN_PURPLE, 12);
-    let mut row = 0u32;
     let max_rows = if h > WIN_TITLE_H + 20 { (h - WIN_TITLE_H - 20) / 18 } else { 0 };
-    for line in lines.iter().take(max_rows as usize) {
-        draw_str_clipped(wx + 12, wy + WIN_TITLE_H + 12 + row * 18, line, TEXT_WHITE, wx + w - 8);
-        row += 1;
+    for (row, line) in lines.iter().take(max_rows as usize).enumerate() {
+        draw_str_clipped(wx + 12, wy + WIN_TITLE_H + 12 + row as u32 * 18, line, TEXT_WHITE, wx + w - 8);
     }
     draw_rect(wx + w - 12, wy + h - 12, 12, 12, ACCENT_TEAL);
     blend_rect(wx + w - 12, wy + h - 12, 12, 6, 0xFFFFFF, 30);
@@ -484,6 +500,7 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
 
 // ── PL-52: AXFS Files Window ─────────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 pub fn render_files_window(
     wx: i32, wy: i32, w: u32, h: u32,
     file_names: &[(*const u8, usize)],
@@ -554,6 +571,7 @@ pub struct EdbEntry {
     pub value: u64,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn render_edb_browser(
     wx: i32, wy: i32, w: u32, h: u32,
     entries: &[EdbEntry],

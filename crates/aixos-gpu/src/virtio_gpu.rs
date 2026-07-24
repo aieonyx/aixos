@@ -27,7 +27,9 @@ const OFF_QUEUE_DEVICE_LOW: usize = 0x0a0;
 const OFF_QUEUE_DEVICE_HIGH: usize = 0x0a4;
 const OFF_CONFIG_SPACE: usize = 0x100;
 const OFF_QUEUE_PFN: usize = 0x040;
+#[allow(dead_code)]
 const QUEUE_PAGE_SHIFT: u32 = 12;
+#[allow(dead_code)]
 const QUEUE_PAGE_SIZE: usize = 4096;
 
 const VIRTIO_MAGIC: u32 = 0x74726976;

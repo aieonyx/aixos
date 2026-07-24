@@ -38,15 +38,15 @@ pub fn init(fb_addr: u64, width: u32, height: u32) -> bool {
         address: (core::ptr::addr_of!(cfg) as u64).to_be(),
     };
     unsafe {
-        { #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack)); } }
+        #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack)); }
         FW_CFG_DMA_ADDR.write_volatile(
             (core::ptr::addr_of!(dma) as u64).to_be()
         );
-        { #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack)); } }
+        #[cfg(target_arch = "aarch64")] { core::arch::asm!("dsb sy", options(nostack)); }
         let mut tries = 0u32;
         loop {
             let ctl = core::ptr::read_volatile(
-                core::ptr::addr_of!(dma.control) as *const u32
+                core::ptr::addr_of!(dma.control)
             ).to_be();
             if ctl & FW_CFG_DMA_CTL_ERROR != 0 { return false; }
             if ctl == 0 { break; }
