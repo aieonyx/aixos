@@ -67,8 +67,7 @@ pub fn bytes_used() -> usize {
 /// Bytes remaining.
 pub fn bytes_free() -> usize {
     unsafe {
-        if BUMP_PTR > HEAP_END { 0 }
-        else { HEAP_END - BUMP_PTR }
+        HEAP_END.saturating_sub(BUMP_PTR)
     }
 }
 
