@@ -116,7 +116,7 @@ fn parse_i64(s: &[u8]) -> Option<i64> {
     Some(if neg { -val } else { val })
 }
 
-fn find_var<'a>(vars: &'a [AxVar], name: &[u8]) -> Option<i64> {
+fn find_var(vars: &[AxVar], name: &[u8]) -> Option<i64> {
     let nlen = name.len();
     let mut i = 0;
     while i < vars.len() {
@@ -133,7 +133,7 @@ fn set_var(vars: &mut [AxVar; MAX_VARS], name: &[u8], value: i64) {
     // find existing
     let mut i = 0;
     while i < MAX_VARS {
-        if vars[i].name_len == nlen && &vars[i].name[..nlen] == &name[..nlen] {
+        if vars[i].name_len == nlen && vars[i].name[..nlen] == name[..nlen] {
             vars[i].value = value;
             return;
         }
