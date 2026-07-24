@@ -317,6 +317,7 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
     BLK_NEXT = BLK_NEXT.wrapping_add(3);
 }
 
+#[allow(unused_unsafe)]
 pub fn store_valid() -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     return false;
@@ -329,6 +330,7 @@ pub fn store_valid() -> bool {
     }
 }
 
+#[allow(unused_unsafe)]
 pub fn store_format(node_id: u64) -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = node_id; return false; }
@@ -342,6 +344,7 @@ pub fn store_format(node_id: u64) -> bool {
     }
 }
 
+#[allow(unused_unsafe)]
 pub fn store_read(key: &[u8]) -> Option<u64> {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = key; return None; }
@@ -371,6 +374,7 @@ pub fn store_read(key: &[u8]) -> Option<u64> {
     }
 }
 
+#[allow(unused_unsafe)]
 pub fn store_write(key: &[u8], value: u64) -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = (key, value); return false; }
