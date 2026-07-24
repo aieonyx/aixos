@@ -33,6 +33,7 @@ pub const STATUS_FAILED: u32 = 128;
 
 // TX queue index for virtio-net (0=RX, 1=TX, 2=ctrl)
 pub const TX_QUEUE: u32 = 1;
+pub const RX_QUEUE: u32 = 0;
 
 // ── Virtqueue (self-contained, no_std, 16-slot) ────────────────────────────────
 pub const QUEUE_SIZE: usize = 16;
@@ -112,6 +113,33 @@ static mut NET_BASE: usize = 0;
 static mut NET_LIVE: bool = false;
 static mut FRAMES_SENT: u32 = 0;
 
+// ── RX state (PL-58) ──────────────────────────────────────────────────────────
+pub const RX_BUF_SIZE: usize = 256;
+pub const RX_LOG_SIZE: usize = 4;
+
+static mut RX_RING: NetRing = NetRing {
+    desc: [VirtqDesc { addr: 0, len: 0, flags: 0, next: 0 }; QUEUE_SIZE],
+    avail: VirtqAvail { flags: 0, idx: 0, ring: [0; QUEUE_SIZE], used_event: 0 },
+    _pad: [0u8; 4096
+               - core::mem::size_of::<[VirtqDesc; QUEUE_SIZE]>()
+               - core::mem::size_of::<VirtqAvail>()],
+    used: VirtqUsed { flags: 0, idx: 0,
+        ring: [VirtqUsedElem { id: 0, len: 0 }; QUEUE_SIZE], avail_event: 0 },
+};
+static mut RX_HDR:  VirtioNetHdr = VirtioNetHdr {
+    flags: 0, gso_type: 0, hdr_len: 0, gso_size: 0,
+    csum_start: 0, csum_offset: 0, num_buffers: 0, _pad: 0,
+};
+static mut RX_BUF:  [u8; RX_BUF_SIZE] = [0u8; RX_BUF_SIZE];
+static mut RX_LAST_USED: u16 = 0;
+static mut FRAMES_RECV: u32 = 0;
+
+// RX log: ring of last 4 frames (node_id + payload copy)
+static mut RX_LOG_NODE:    [u64; RX_LOG_SIZE] = [0u64; RX_LOG_SIZE];
+static mut RX_LOG_PAYLOAD: [[u8; 64]; RX_LOG_SIZE] = [[0u8; 64]; RX_LOG_SIZE];
+static mut RX_LOG_PLEN:    [usize; RX_LOG_SIZE] = [0usize; RX_LOG_SIZE];
+static mut RX_LOG_HEAD:    usize = 0;
+
 // ── MMIO helpers ──────────────────────────────────────────────────────────────
 #[inline]
 unsafe fn read32(base: usize, off: usize) -> u32 {
@@ -182,6 +210,115 @@ pub fn init() -> bool {
 
 pub fn is_live() -> bool { unsafe { NET_LIVE } }
 pub fn frames_sent() -> u32 { unsafe { FRAMES_SENT } }
+pub fn frames_received() -> u32 { unsafe { FRAMES_RECV } }
+
+/// Get RX log entry i (0=oldest). Returns (node_id, payload_slice) or None.
+pub fn rx_log_entry(i: usize) -> Option<(u64, &'static [u8])> {
+    if i >= RX_LOG_SIZE { return None; }
+    unsafe {
+        let idx = (RX_LOG_HEAD + RX_LOG_SIZE - RX_LOG_SIZE.min(FRAMES_RECV as usize) + i) % RX_LOG_SIZE;
+        if RX_LOG_PLEN[idx] == 0 { return None; }
+        Some((RX_LOG_NODE[idx], &RX_LOG_PAYLOAD[idx][..RX_LOG_PLEN[idx]]))
+    }
+}
+
+/// Set up virtio-net RX queue (queue 0) and post receive buffers.
+/// Must be called after init() succeeds.
+pub fn init_rx() -> bool {
+    #[cfg(not(target_arch = "aarch64"))]
+    return false;
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        if !NET_LIVE { return false; }
+        let base = NET_BASE;
+
+        // Select RX queue (queue 0)
+        write32(base, OFF_QUEUE_SEL, RX_QUEUE);
+        let qmax = read32(base, OFF_QUEUE_MAX);
+        if qmax == 0 { return false; }
+        let qsize = (QUEUE_SIZE as u32).min(qmax);
+        write32(base, OFF_QUEUE_NUM, qsize);
+        write32(base, OFF_QUEUE_ALIGN, 4096);
+        let ring_addr = core::ptr::addr_of_mut!(RX_RING) as u64;
+        write32(base, OFF_QUEUE_PFN, (ring_addr >> 12) as u32);
+
+        // Post one receive buffer: [hdr(W)] -> [data(W)]
+        let ring = &mut *core::ptr::addr_of_mut!(RX_RING);
+        ring.desc[0] = VirtqDesc {
+            addr:  core::ptr::addr_of_mut!(RX_HDR) as u64,
+            len:   core::mem::size_of::<VirtioNetHdr>() as u32,
+            flags: 0x2 | 0x1, // WRITE | NEXT
+            next:  1,
+        };
+        ring.desc[1] = VirtqDesc {
+            addr:  core::ptr::addr_of_mut!(RX_BUF) as u64,
+            len:   RX_BUF_SIZE as u32,
+            flags: 0x2, // WRITE
+            next:  0,
+        };
+        ring.avail.ring[0] = 0;
+        dsb();
+        ring.avail.idx = 1;
+        dsb();
+        // Notify device: queue 0 = RX
+        write32(base, OFF_QUEUE_NOTIF, RX_QUEUE);
+        RX_LAST_USED = 0;
+        true
+    }
+}
+
+/// Poll RX queue for incoming frames. Parses AWP header if present.
+/// Returns true if a new frame was received.
+pub fn poll_rx() -> bool {
+    #[cfg(not(target_arch = "aarch64"))]
+    return false;
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        if !NET_LIVE { return false; }
+        let ring = &mut *core::ptr::addr_of_mut!(RX_RING);
+        dsb();
+        let used_idx = core::ptr::read_volatile(&ring.used.idx);
+        if used_idx == RX_LAST_USED { return false; }
+
+        // Frame received — parse AWP header
+        let buf = &*core::ptr::addr_of!(RX_BUF);
+        if buf.len() >= AWP_FRAME_HDR {
+            let magic_ok = buf[0] == AWP_MAGIC[0] && buf[1] == AWP_MAGIC[1]
+                && buf[2] == AWP_MAGIC[2] && buf[3] == AWP_MAGIC[3]
+                && buf[4] == AWP_MAGIC[4] && buf[5] == AWP_MAGIC[5]
+                && buf[6] == AWP_MAGIC[6] && buf[7] == AWP_MAGIC[7];
+            if magic_ok {
+                let node_id = u64::from_le_bytes([
+                    buf[8], buf[9], buf[10], buf[11],
+                    buf[12], buf[13], buf[14], buf[15],
+                ]);
+                let plen = u32::from_le_bytes([buf[20], buf[21], buf[22], buf[23]]) as usize;
+                let plen = plen.min(64).min(RX_BUF_SIZE - AWP_FRAME_HDR);
+
+                // Store in RX log
+                let slot = RX_LOG_HEAD % RX_LOG_SIZE;
+                RX_LOG_NODE[slot] = node_id;
+                RX_LOG_PLEN[slot] = plen;
+                let mut i = 0;
+                while i < plen {
+                    RX_LOG_PAYLOAD[slot][i] = buf[AWP_FRAME_HDR + i];
+                    i += 1;
+                }
+                RX_LOG_HEAD = (RX_LOG_HEAD + 1) % RX_LOG_SIZE;
+                FRAMES_RECV += 1;
+            }
+        }
+
+        // Re-post the buffer
+        RX_LAST_USED = used_idx;
+        ring.avail.ring[(ring.avail.idx as usize) % QUEUE_SIZE] = 0;
+        dsb();
+        ring.avail.idx = ring.avail.idx.wrapping_add(1);
+        dsb();
+        write32(NET_BASE, OFF_QUEUE_NOTIF, RX_QUEUE);
+        true
+    }
+}
 
 /// Build and transmit one AWP frame via virtio-net TX queue.
 /// payload: up to AWP_MAX_PAYLOAD bytes.

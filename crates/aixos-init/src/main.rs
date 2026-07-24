@@ -679,11 +679,12 @@ fn render_window_for_slot(i: usize) {
                 "AWP:    stub  no virtio-net"
             };
             let frames = aixos_net::virtio_net::frames_sent();
+            let frames_rx = aixos_net::virtio_net::frames_received();
             // format frames_sent into static buffer
             static mut NET_STATUS_BUF: [u8; 32] = [0u8; 32];
             let frames_str = unsafe {
                 let b = &mut *core::ptr::addr_of_mut!(NET_STATUS_BUF);
-                b[..8].copy_from_slice(b"Frames: ");
+                b[..8].copy_from_slice(b"TX/RX:  ");
                 let mut n = frames;
                 let mut pos = 8usize;
                 if n == 0 {
@@ -695,8 +696,14 @@ fn render_window_for_slot(i: usize) {
                     let mut ti = tlen;
                     while ti > 0 { ti -= 1; b[pos] = tmp[ti]; pos += 1; }
                 }
+                b[pos] = b'/'; pos += 1;
+                let mut nr = frames_rx;
+                let mut tmp2=[0u8;8];let mut tl2=0;
+                if nr==0{tmp2[0]=b'0';tl2=1;}else{while nr>0{tmp2[tl2]=b'0'+(nr%10)as u8;tl2+=1;nr/=10;}}
+                let mut ti2=tl2;while ti2>0{ti2-=1;b[pos]=tmp2[ti2];pos+=1;}
                 core::str::from_utf8_unchecked(&b[..pos])
             };
+            aixos_net::virtio_net::poll_rx();
             aixos_gpu::desktop::render_window(
                 "Network - aiXos Phoenix",
                 &[awp_status,
