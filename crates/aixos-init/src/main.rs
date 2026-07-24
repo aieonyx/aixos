@@ -504,7 +504,7 @@ pub extern "C" fn aixos_main() -> ! {
                 uart_write("boot: name restored\n");
             }
         }
-        // PL-54: sync restored identity into DESKTOP_STATE immediately
+        // Sync restored identity into DESKTOP_STATE immediately
         DESKTOP_STATE.tz_offset = TZ_OFFSET;
         DESKTOP_STATE.user_name = core::slice::from_raw_parts(
             USER_NAME_BUF.as_ptr(), USER_NAME_LEN);
@@ -820,7 +820,7 @@ fn handle_dock_click(x: i32, y: i32) {
             0 => 0, // Onyxia -> Node window (placeholder)
             1 => 0, // Browser -> Node window (placeholder)
             2 => 1, // Shell
-            3 => 2, // Files -> EDB store (closest match)
+            3 => 6, // Files -> AXFS Files window
             4 => 4, // EDB Browser
             5 => 3, // IAM -> Settings (placeholder)
             6 => 3, // Settings
@@ -840,7 +840,7 @@ fn handle_dock_click(x: i32, y: i32) {
                 }
                 // If no free slot, do nothing (all 5 windows open)
             }
-            if kind == 1 { WINDOW_FOCUSED = true; }
+            if kind == 1 || kind == 6 { WINDOW_FOCUSED = true; }
             if kind == 4 {
                 EDB_CURSOR = 0;
                 EDB_SCROLL = 0;
