@@ -4,7 +4,7 @@
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_rect, draw_rounded_border};
 use crate::framebuffer::cache_flush;
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
-use crate::font16::{draw_str_16, draw_str_16_clipped};
+use crate::font16::{draw_str_16, draw_str_16_clipped, draw_char_16};
 
 const DARK_BG:          u32 = 0x0D0B1F;
 const DARK_BG2:         u32 = 0x1A0E2E;
@@ -180,13 +180,13 @@ pub fn render_desktop(state: &DesktopState) {
     // PL-49: show user name if set, else fallback to "E" + hex node_id
     if !state.user_name.is_empty() {
         if let Ok(s) = core::str::from_utf8(state.user_name) {
-            draw_str(30, TOP_BAR_H + 63, s, TEXT_WHITE);
+            draw_str_16(20, TOP_BAR_H + 58, s, TEXT_WHITE);
         }
-        draw_str(30, TOP_BAR_H + 73, "Sovereign", 0x44446A);
+        draw_str(20, TOP_BAR_H + 76, "Sovereign", 0x44446A);
     } else {
-        draw_str(30, TOP_BAR_H + 63, "E", TEXT_WHITE);
-        draw_hex32(60, TOP_BAR_H + 55, state.node_id as u32, TEXT_WHITE);
-        draw_str(60, TOP_BAR_H + 68, "Sovereign", 0x44446A);
+        draw_str_16(20, TOP_BAR_H + 58, "E", TEXT_WHITE);
+        draw_hex32(36, TOP_BAR_H + 60, state.node_id as u32, TEXT_WHITE);
+        draw_str(20, TOP_BAR_H + 76, "Sovereign", 0x44446A);
     }
     draw_hline(16, TOP_BAR_H + 90, PANEL_W - 16, GLASS_BORDER);
     draw_str_16(20, TOP_BAR_H + 104, "SPACES", 0x44446A);
@@ -278,7 +278,7 @@ pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day:
     draw_rect(12, 23, 12, 2, TEXT_WHITE);
     // aiXos Phoenix centered — left cleared
     // Centered sovereign wordmark — IAM search deferred to future phase
-    draw_str_15x(494, 10, "aiXos Phoenix", 0x444466);
+    draw_str_16(582, 8, "aiXos Phoenix", 0x555588);
     // Clock drawn in render_desktop() where state is in scope
     // Real date+time from PL031 RTC
     let digs = b"0123456789";
@@ -458,7 +458,7 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_hline(tx.saturating_sub(2), ty + 2,               5, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
-    draw_str_15x_clipped(wx + 24, wy + 4, title, TEXT_WHITE, wx + w - 24);
+    draw_str_16_clipped(wx + 24, wy + 4, title, TEXT_WHITE, wx + w - 24);
     let cx = wx + w - 18;
     let cy = wy + 7;
     draw_rect(cx, cy, 10, 10, CLOSE_RED);
@@ -492,8 +492,10 @@ pub fn render_window_output_hw(wx: i32, wy: i32, lines: &[&'static str], count: 
     let mut y = wy + 30;
     let mut idx = 0;
     while idx < n {
-        draw_str_clipped((wx + 8) as u32, y as u32, lines[idx], TEXT_WHITE, (wx + 572) as u32);
-        y += 18;
+        // PL-59.4: 8x16 font for shell output
+        draw_str_16_clipped((wx + 8) as u32, y as u32, lines[idx], TEXT_WHITE,
+            (wx as u32).saturating_add(ww).saturating_sub(12));
+        y += 20;
         idx += 1;
     }
 }
@@ -508,7 +510,7 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
     let y = wy + wh as i32 - 20;
     let y = if y < wy + 30 { wy + 30 } else { y };
     draw_rect((wx + 4) as u32, (y - 2) as u32, ww.saturating_sub(8), 18, WIN_BG);
-    draw_str((wx + 8) as u32, y as u32, "win> ", ACCENT_TEAL);
+    draw_str_16((wx + 8) as u32, (y - 2) as u32, "win> ", ACCENT_TEAL);
     if let Ok(txt) = core::str::from_utf8(&buf[..len]) {
         draw_str((wx + 48) as u32, y as u32, txt, TEXT_WHITE);
     }
@@ -516,7 +518,7 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
     if focused {
         // Draw [focused] inside window right edge
         let fx = (wx as u32 + ww).saturating_sub(80);
-        draw_str(fx, y as u32, "[focused]", TEXT_DIM);
+        draw_str_16(fx, (y - 2) as u32, "[focused]", TEXT_DIM);
     }
 }
 
@@ -653,13 +655,14 @@ pub fn render_edb_browser(
     }
     draw_hline(wx_u + 4, input_row_y - 3, w - 8, PANEL_BORDER);
     draw_rect(wx_u + 4, input_row_y - 1, w - 8, 18, WIN_BG);
-    draw_str(wx_u + 8, input_row_y + 2, "edb>", ACCENT_TEAL);
+    draw_str_16(wx_u + 8, input_row_y, "edb>", ACCENT_TEAL);
     let buf_x = wx_u + 40;
     if let Ok(txt) = core::str::from_utf8(&input_buf[..input_len]) {
-        draw_str(buf_x, input_row_y + 2, txt, TEXT_WHITE);
+        // PL-59.4: 8x16 input line
+    draw_str_16(buf_x, input_row_y, txt, TEXT_WHITE);
     }
-    draw_str(buf_x + (input_len as u32) * 9, input_row_y + 2, "_", TEXT_WHITE);
-    if focused { draw_str(wx_u + w - 80, input_row_y + 2, "[focused]", TEXT_DIM); }
+    draw_str_16(buf_x + (input_len as u32) * 9, input_row_y, "_", ACCENT_TEAL);
+    if focused { draw_str_16(wx_u + w - 80, input_row_y, "[focused]", TEXT_DIM); }
     draw_rect(wx_u + w - 12, (wy + h as i32 - 12) as u32, 12, 12, ACCENT_TEAL);
     draw_rect(wx_u + w - 8,  (wy + h as i32 - 8) as u32,  4,  4,  TEXT_WHITE);
 }
