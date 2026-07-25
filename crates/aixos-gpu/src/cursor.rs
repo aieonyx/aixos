@@ -31,7 +31,7 @@ pub fn draw_cursor(fb: &mut [u32], stride: usize, x: i32, y: i32) {
         for col in 0..CURSOR_W {
             let px = x + col as i32;
             let py = y + row as i32;
-            if px < 0 || px >= SCREEN_W || py < 0 || py >= SCREEN_H {
+            if !(0..SCREEN_W).contains(&px) || !(0..SCREEN_H).contains(&py) {
                 continue;
             }
             let idx = py as usize * stride + px as usize;
@@ -55,7 +55,7 @@ pub fn erase_cursor(fb: &mut [u32], stride: usize, x: i32, y: i32) {
         for col in 0..CURSOR_W {
             let px = x + col as i32;
             let py = y + row as i32;
-            if px < 0 || px >= SCREEN_W || py < 0 || py >= SCREEN_H {
+            if !(0..SCREEN_W).contains(&px) || !(0..SCREEN_H).contains(&py) {
                 continue;
             }
             let idx = py as usize * stride + px as usize;

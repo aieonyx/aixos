@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "aixos-axfs"
+version = "0.1.0"
+dependencies = [
+ "aixos-kernel",
+]
+
+[[package]]
 name = "aixos-edisondb"
 version = "0.1.0"
 
@@ -10,6 +17,7 @@ version = "0.1.0"
 name = "aixos-gpu"
 version = "0.1.0"
 dependencies = [
+ "aixos-edisondb",
  "aixos-kernel",
 ]
 
@@ -28,6 +36,7 @@ dependencies = [
 name = "aixos-init"
 version = "0.1.0"
 dependencies = [
+ "aixos-axfs",
  "aixos-edisondb",
  "aixos-gpu",
  "aixos-identity",
