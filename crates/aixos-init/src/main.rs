@@ -36,7 +36,7 @@ impl ShellBuf {
 
 fn hist_push(buf: &ShellBuf) { unsafe { if buf.len == 0 { return; } let slot = HIST_COUNT % HIST_SIZE; HIST[slot] = buf.data; HIST_LEN[slot] = buf.len; HIST_COUNT += 1; HIST_NAV = 0; TAB_ACTIVE = false; } }
 fn hist_nav(buf: &mut ShellBuf, older: bool) { unsafe { let total = HIST_COUNT.min(HIST_SIZE); if total == 0 { return; } if older { if HIST_NAV < total { HIST_NAV += 1; } } else { if HIST_NAV > 0 { HIST_NAV -= 1; } } if HIST_NAV == 0 { buf.clear(); return; } let idx = (HIST_COUNT.wrapping_sub(HIST_NAV)) % HIST_SIZE; buf.data = HIST[idx]; buf.len = HIST_LEN[idx]; } }
-const CMDS: &[&[u8]] = &[b"help",b"clear",b"version",b"db",b"window",b"settings",b"browse",b"close",b"reboot",b"tz",b"name",b"ls",b"cat",b"write",b"awp",b"awp recv",b"mem",b"node-id",b"sovereignty",b"awp-status",b"run"];
+const CMDS: &[&[u8]] = &[b"help",b"clear",b"version",b"db",b"window",b"settings",b"browse",b"close",b"reboot",b"tz",b"name",b"ls",b"cat",b"write",b"awp",b"awp recv",b"mem",b"node-id",b"sovereignty",b"awp-status",b"run",b"ps",b"spawn",b"kill"];
 fn tab_complete(buf: &mut ShellBuf) { unsafe { let prefix = &buf.data[..buf.len]; let mut matches = [0usize;20]; let mut mc=0usize; let mut ci=0; while ci<CMDS.len() { let cmd=CMDS[ci]; if cmd.len()>=prefix.len() && &cmd[..prefix.len()]==prefix { if mc<20{matches[mc]=ci;mc+=1;} } ci+=1; } if mc==0{TAB_ACTIVE=false;TAB_CYCLE=0;return;} let pick=if !TAB_ACTIVE{TAB_CYCLE=0;0}else{let t=TAB_CYCLE%mc;TAB_CYCLE=(TAB_CYCLE+1)%mc;t}; TAB_ACTIVE=true; let cmd=CMDS[matches[pick]]; let len=cmd.len().min(63); let mut i=0; while i<len{buf.data[i]=cmd[i];i+=1;} buf.len=len; } }
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
@@ -81,6 +81,59 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                 else{let mut ti=tl;while ti>0{ti-=1;b[pos]=tmp[ti];pos+=1;}}
                 core::str::from_utf8_unchecked(&b[..pos])
             }
+        }
+        // PL-62: process table commands
+        b"ps" => {
+            unsafe {
+                static mut PS_BUF: [u8; 80] = [0u8; 80];
+                let cnt = aixos_kernel::proc::proc_count();
+                let ticks = aixos_kernel::proc::tick_total();
+                let b = &mut *core::ptr::addr_of_mut!(PS_BUF);
+                let hdr = b"procs:";
+                let mut pos = 0usize;
+                let mut i = 0; while i < 6 { b[pos]=hdr[i]; pos+=1; i+=1; }
+                let mut n = cnt;
+                if n == 0 { b[pos]=b'0'; pos+=1; }
+                else { let mut tmp=[0u8;4];let mut tl=0; while n>0{tmp[tl]=b'0'+(n%10)as u8;tl+=1;n/=10;} let mut ti=tl; while ti>0{ti-=1;b[pos]=tmp[ti];pos+=1;} }
+                let s2 = b"  ticks:";
+                i=0; while i<8{b[pos]=s2[i];pos+=1;i+=1;}
+                let mut t = ticks;
+                if t == 0 { b[pos]=b'0'; pos+=1; }
+                else { let mut tmp=[0u8;12];let mut tl=0; while t>0{tmp[tl]=b'0'+(t%10)as u8;tl+=1;t/=10;} let mut ti=tl; while ti>0{ti-=1;b[pos]=tmp[ti];pos+=1;} }
+                let s3 = b"  open proc window";
+                i=0; while i<s3.len()&&pos<79{b[pos]=s3[i];pos+=1;i+=1;}
+                core::str::from_utf8_unchecked(&b[..pos])
+            }
+        }
+        cmd if cmd.len() > 6 && &cmd[..6] == b"spawn " => {
+            let name = &cmd[6..];
+            match aixos_kernel::proc::spawn(name, aixos_kernel::proc::ProcState::Ready, 128) {
+                Some(pid) => {
+                    unsafe {
+                        static mut SPAWN_BUF: [u8; 32] = [0u8; 32];
+                        let b = &mut *core::ptr::addr_of_mut!(SPAWN_BUF);
+                        let hdr = b"spawned pid:";
+                        let mut pos=0usize;
+                        let mut i=0; while i<12{b[pos]=hdr[i];pos+=1;i+=1;}
+                        let mut tmp=[0u8;4];let mut tl=0;let mut n=pid as usize;
+                        if n==0{b[pos]=b'0';pos+=1;}
+                        else{while n>0{tmp[tl]=b'0'+(n%10)as u8;tl+=1;n/=10;}let mut ti=tl;while ti>0{ti-=1;b[pos]=tmp[ti];pos+=1;}}
+                        core::str::from_utf8_unchecked(&b[..pos])
+                    }
+                }
+                None => "proc table full (max 8)",
+            }
+        }
+        cmd if cmd.len() > 5 && &cmd[..5] == b"kill " => {
+            let pid_bytes = &cmd[5..];
+            let mut pid: u8 = 0;
+            let mut i = 0;
+            while i < pid_bytes.len() {
+                let c = pid_bytes[i];
+                if c >= b'0' && c <= b'9' { pid = pid.wrapping_mul(10).wrapping_add(c - b'0'); }
+                i += 1;
+            }
+            if aixos_kernel::proc::kill(pid) { "process killed" } else { "kill failed (pid 0 protected or not found)" }
         }
         b"reboot" => {
             uart_write("axos> reboot\n");
@@ -432,6 +485,18 @@ static mut EDB_CURSOR: usize = 0;
 static mut EDB_SCROLL: usize = 0;
 static mut EDB_INPUT: ShellBuf = ShellBuf::new();
 static mut EDB_FOCUSED: bool = false;
+// PL-62: process window slot buffer for GUI rendering
+static mut PROC_SLOTS: [aixos_gpu::desktop::ProcSlot; 8] = [
+    aixos_gpu::desktop::ProcSlot::empty(),
+    aixos_gpu::desktop::ProcSlot::empty(),
+    aixos_gpu::desktop::ProcSlot::empty(),
+    aixos_gpu::desktop::ProcSlot::empty(),
+    aixos_gpu::desktop::ProcSlot::empty(),
+    aixos_gpu::desktop::ProcSlot::empty(),
+    aixos_gpu::desktop::ProcSlot::empty(),
+    aixos_gpu::desktop::ProcSlot::empty(),
+];
+static mut PROC_COUNT: usize = 0;
 // PL-60: Onyxia browser state
 static mut ONY_URL_BUF: ShellBuf = ShellBuf::new();
 static mut ONY_URL_FOCUSED: bool = false;
@@ -493,6 +558,11 @@ pub extern "C" fn aixos_main() -> ! {
         let free_kb = aixos_kernel::alloc::bytes_free() / 1024;
         // Just log — bump allocator needs no explicit init
         uart_write("sovereign heap ready\n");
+        let _ = free_kb;
+    }
+    // PL-62: register sovereign system processes
+    aixos_kernel::proc::boot_register();
+    uart_write("proc: [kernel][shell][desktop] registered\n");
         // Make a boot allocation as proof
         let _proof = aixos_kernel::alloc::alloc_val::<u64>(0x4153u64);
     }
@@ -814,6 +884,43 @@ fn render_window_for_slot(i: usize) {
                 );
             }
         }
+        // PL-62: Process Table window
+        8 => {
+            unsafe {
+                // Snapshot process table into PROC_SLOTS
+                let mut si = 0usize;
+                let mut ki = 0usize;
+                while ki < 8 {
+                    if let Some(p) = aixos_kernel::proc::proc_at(ki) {
+                        let sc = match p.state {
+                            aixos_kernel::proc::ProcState::Running => b'R',
+                            aixos_kernel::proc::ProcState::Ready   => b'W',
+                            aixos_kernel::proc::ProcState::Blocked => b'B',
+                            aixos_kernel::proc::ProcState::Dead    => b'D',
+                            _                                       => b'?',
+                        };
+                        PROC_SLOTS[si].pid      = p.pid;
+                        PROC_SLOTS[si].name     = p.name;
+                        PROC_SLOTS[si].name_len = p.name_len;
+                        PROC_SLOTS[si].state_ch = sc;
+                        PROC_SLOTS[si].priority = p.priority;
+                        PROC_SLOTS[si].ticks    = p.ticks;
+                        PROC_SLOTS[si].yields   = p.yields;
+                        si += 1;
+                    }
+                    ki += 1;
+                }
+                PROC_COUNT = si;
+                let tick = aixos_kernel::proc::tick_total();
+                aixos_gpu::desktop::render_window("Processes", &[], w.w, w.h);
+                aixos_gpu::desktop::render_proc_window(
+                    w.x, w.y, w.w, w.h,
+                    &PROC_SLOTS[..si],
+                    si,
+                    tick,
+                );
+            }
+        }
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
@@ -930,7 +1037,7 @@ fn handle_dock_click(x: i32, y: i32) {
             2 => 1, // Shell
             3 => 6, // Files -> AXFS Files window
             4 => 4, // EDB Browser
-            5 => 3, // IAM -> Settings (placeholder)
+            5 => 8, // I=IAM/Processes -> Process Table window (PL-62)
             6 => 3, // Settings
             _ => return,
         };
@@ -1580,6 +1687,8 @@ fn shell_loop(
             }
             handle_key(&mut buf, ev.code, ev.ch);
         }
+        // PL-62: cooperative scheduler tick — advances process table each loop iteration
+        unsafe { aixos_kernel::proc::scheduler_tick(); }
     }
 }
 

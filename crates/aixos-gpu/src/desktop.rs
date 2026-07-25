@@ -470,6 +470,7 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
                 3 => 6, // Set  -> S
                 4 => 4, // EDB browser -> D
                 7 => 0, // Onyxia browser -> O (diamond icon)
+                8 => 5, // Process window -> I (person/IAM icon)
                 _ => 0,
             };
             let dot_x = dock_x + 10 + dock_idx * (icon_w + icon_gap) + icon_w / 2 - 3;
@@ -1034,3 +1035,130 @@ pub fn render_onyxia_browser(
     }
 }
 
+// ── PL-62: Process Window ─────────────────────────────────────────────────────
+// Renders the sovereign process table inside a standard window chrome.
+// proc_slots: array of (name, state_char, priority, ticks, pid) tuples.
+// count: number of valid slots.
+// tick_total: global scheduler tick counter for header display.
+
+pub struct ProcSlot {
+    pub pid:      u8,
+    pub name:     [u8; 16],
+    pub name_len: usize,
+    /// 'R'=Running 'W'=Ready 'B'=Blocked 'D'=Dead
+    pub state_ch: u8,
+    pub priority: u8,
+    pub ticks:    u64,
+    pub yields:   u32,
+}
+
+impl ProcSlot {
+    pub const fn empty() -> Self {
+        ProcSlot { pid:0, name:[0u8;16], name_len:0, state_ch:0, priority:0, ticks:0, yields:0 }
+    }
+    pub fn name_str(&self) -> &str {
+        core::str::from_utf8(&self.name[..self.name_len]).unwrap_or("?")
+    }
+}
+
+pub fn render_proc_window(
+    wx: i32, wy: i32, w: u32, h: u32,
+    slots: &[ProcSlot],
+    count: usize,
+    tick_total: u64,
+) {
+    let wx_u = wx as u32;
+    let wy_u = wy as u32;
+    let _ = wy_u;
+
+    // ── Column header row ─────────────────────────────────────────────────────
+    let hdr_y = (wy + WIN_TITLE_H as i32 + 4) as u32;
+    draw_rect(wx_u + 1, hdr_y, w - 2, 14, 0x0A0A1A);
+    draw_str(wx_u + 6,  hdr_y + 4, "PID", TEXT_DIM);
+    draw_str(wx_u + 28, hdr_y + 4, "NAME            ", TEXT_DIM);
+    draw_str(wx_u + 148, hdr_y + 4, "ST", TEXT_DIM);
+    draw_str(wx_u + 168, hdr_y + 4, "PRI", TEXT_DIM);
+    draw_str(wx_u + 196, hdr_y + 4, "TICKS", TEXT_DIM);
+    draw_str(wx_u + 252, hdr_y + 4, "YIELDS", TEXT_DIM);
+
+    // Tick total in header right
+    draw_str(wx_u + w - 120, hdr_y + 4, "tick:", TEXT_DIM);
+    draw_hex32(wx_u + w - 84, hdr_y + 4, tick_total as u32, ACCENT_TEAL);
+
+    let sep_y = hdr_y + 14;
+    draw_hline(wx_u + 4, sep_y, w - 8, PANEL_BORDER);
+
+    // ── Process rows ──────────────────────────────────────────────────────────
+    let row_h: u32 = 16;
+    let body_top = sep_y + 2;
+    let max_rows = if h > (body_top - (wy as u32)) + 20 {
+        ((h - (body_top - wy as u32) - 20) / row_h) as usize
+    } else { 0 };
+
+    draw_rect(wx_u + 1, body_top, w - 2,
+        (max_rows as u32 * row_h + 4).min(h.saturating_sub(body_top - wy as u32)),
+        WIN_BG);
+
+    let n = count.min(max_rows).min(slots.len());
+    let mut row = 0usize;
+    while row < n {
+        let s = &slots[row];
+        let ry = body_top + row as u32 * row_h;
+
+        // Row highlight for Running
+        let is_running = s.state_ch == b'R';
+        if is_running {
+            draw_rect(wx_u + 2, ry, w - 4, row_h - 1, 0x0A1A12);
+        }
+
+        // PID
+        let pid_col = if is_running { ACCENT_TEAL } else { TEXT_DIM };
+        draw_hex32(wx_u + 6, ry + 4, s.pid as u32, pid_col);
+
+        // Name (clipped to column width)
+        let name_col = if is_running { TEXT_WHITE } else { 0x9999BB };
+        draw_str_clipped(wx_u + 28, ry + 4, s.name_str(), name_col, wx_u + 148);
+
+        // State char
+        let st_col = match s.state_ch {
+            b'R' => ACCENT_TEAL,
+            b'W' => ACCENT_AMBER,
+            b'B' => 0x6666AA,
+            b'D' => 0x664444,
+            _    => TEXT_DIM,
+        };
+        let st_str: &str = match s.state_ch {
+            b'R' => "R",
+            b'W' => "W",
+            b'B' => "B",
+            b'D' => "D",
+            _    => "?",
+        };
+        draw_str(wx_u + 148, ry + 4, st_str, st_col);
+
+        // Priority
+        draw_hex32(wx_u + 168, ry + 4, s.priority as u32, TEXT_DIM);
+
+        // Ticks (low 32 bits)
+        draw_hex32(wx_u + 196, ry + 4, s.ticks as u32, TEXT_DIM);
+
+        // Yields
+        draw_hex32(wx_u + 252, ry + 4, s.yields, TEXT_DIM);
+
+        row += 1;
+    }
+
+    if count == 0 {
+        draw_str(wx_u + 12, body_top + 6, "[no processes registered]", TEXT_DIM);
+    }
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    let foot_y = (wy + h as i32 - 18) as u32;
+    draw_hline(wx_u + 4, foot_y - 2, w - 8, PANEL_BORDER);
+    draw_str(wx_u + 8,  foot_y + 2, "PL-62 cooperative scheduler", TEXT_DIM);
+    draw_str(wx_u + w - 90, foot_y + 2, "R=run W=wait B=blk D=dead", 0x333355);
+
+    // Resize handle
+    draw_rect(wx_u + w - 12, (wy + h as i32 - 12) as u32, 12, 12, ACCENT_TEAL);
+    draw_rect(wx_u + w - 8,  (wy + h as i32 - 8)  as u32, 4,  4,  TEXT_WHITE);
+}

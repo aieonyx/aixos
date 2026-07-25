@@ -12,3 +12,7 @@ path = "src/lib.rs"
 [dependencies]
 aixos-kernel = { path = "../aixos-kernel" }
 aixos-haniel = { path = "../aixos-haniel" }
+# PL-62: upstream axon_interp — single source of truth (P71.5, c7327f4)
+# Replaces local src/axon_interp.rs. Expanded: MAX_LINES=64, MAX_VARS=16,
+# OUTPUT_BUF=2048, eval_expr() binary ops, exec_with_state() REPL sessions.
+axon_interp = { path = "../../AXON/crates/axon_interp", default-features = false }

@@ -4,7 +4,10 @@
 
 use aixos_haniel::{render_sovereign_surface, render_text};
 use aixos_kernel::SovereignBoot;
-pub mod axon_interp;
+
+// PL-62: use upstream axon_interp crate (P71.5) — local copy retired
+// MAX_LINES=64, MAX_VARS=16, OUTPUT_BUF=2048, binary ops, exec_with_state()
+pub use axon_interp as axon_interp;
 
 const BOOT_BANNER: &str = "aiXos Phoenix - Sovereign Stack Initializing...";
 
