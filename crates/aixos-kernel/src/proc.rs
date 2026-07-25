@@ -72,6 +72,10 @@ impl ProcessTable {
     }
 }
 
+impl Default for ProcessTable {
+    fn default() -> Self { Self::new() }
+}
+
 static mut PTABLE: ProcessTable = ProcessTable::new();
 
 /// Register a new process. Returns its PID, or None if table is full.
