@@ -3,9 +3,8 @@
 #![allow(dead_code)]
 
 use crate::draw::{draw_rect, draw_border, draw_hline, draw_vline, blend_rect, draw_rounded_rect, draw_rounded_border};
-use crate::framebuffer::cache_flush;
-use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
-use crate::font16::{draw_str_16, draw_str_16_clipped, draw_char_16};
+use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32};
+use crate::font16::{draw_str_16, draw_str_16_clipped};
 
 const DARK_BG:          u32 = 0x0D0B1F;
 const DARK_BG2:         u32 = 0x1A0E2E;

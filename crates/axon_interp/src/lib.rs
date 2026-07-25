@@ -25,6 +25,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)]
 
+// PL-62: bare-metal no_std prelude — required when std feature is disabled
+#[cfg(not(feature = "std"))]
+use core::prelude::rust_2021::*;
+#[cfg(not(feature = "std"))]
+use core::{cmp::Ord, iter::Iterator, option::Option::{self, Some, None}};
+
 pub const MAX_LINES:    usize = 64;   // doubled from PL-59.1 (was 32)
 pub const MAX_VARS:     usize = 16;   // doubled (was 8)
 pub const VAR_NAME_LEN: usize = 32;   // doubled (was 16)
