@@ -559,13 +559,12 @@ pub extern "C" fn aixos_main() -> ! {
         // Just log — bump allocator needs no explicit init
         uart_write("sovereign heap ready\n");
         let _ = free_kb;
+        // Make a boot allocation as proof
+        let _proof = aixos_kernel::alloc::alloc_val::<u64>(0x4153u64);
     }
     // PL-62: register sovereign system processes
     aixos_kernel::proc::boot_register();
     uart_write("proc: [kernel][shell][desktop] registered\n");
-        // Make a boot allocation as proof
-        let _proof = aixos_kernel::alloc::alloc_val::<u64>(0x4153u64);
-    }
     // PL-53: probe virtio-net and send boot AWP frame
     {
         let net_live = aixos_net::virtio_net::init();
