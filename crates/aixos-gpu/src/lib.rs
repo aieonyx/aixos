@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), no_std)]
 
 pub mod commands;
+pub mod font16;
 pub mod logo;
 pub mod cursor;
 pub mod draw;
@@ -261,3 +262,5 @@ pub fn read_status() -> u32 {
 pub fn read_status() -> u32 { 0 }
 
 pub use logo::{blit_logo, blit_raw, LOGO_W, LOGO_H};
+
+pub use font16::{draw_str_16, draw_str_16_clipped, draw_char_16};

@@ -4,6 +4,7 @@
 use crate::draw::{draw_rect, draw_border, draw_hline, blend_rect, draw_rounded_rect, draw_rounded_border};
 use crate::framebuffer::cache_flush;
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32, draw_str_15x, draw_str_15x_clipped};
+use crate::font16::{draw_str_16, draw_str_16_clipped};
 
 const DARK_BG:          u32 = 0x0D0B1F;
 const DARK_BG2:         u32 = 0x1A0E2E;
@@ -80,7 +81,7 @@ pub fn render_splash() {
         i += 1;
     }
     draw_str_2x(584, 370, "AIEONYX", ACCENT_TEAL);
-    draw_str(512, 408, "Sovereign Digital Infrastructure", TEXT_DIM);
+    // tagline removed
     draw_str(516, 440, "aiXos Phoenix  v0.1.0  aarch64", TEXT_WHITE);
     draw_str(504, 460, "axon_main() -> 0x4153  [SOVEREIGN]", ACCENT_TEAL);
     draw_rect(390, 500, 500, 12, PANEL_BG);
@@ -165,15 +166,15 @@ pub fn render_desktop(state: &DesktopState) {
     crate::logo::blit_logo(logo_x, logo_y);
 
     // AIEONYX wordmark — brighter, 2x size
-    draw_str_2x(581, logo_y + crate::logo::LOGO_H + 8, "AIEONYX", 0x5A5ABB);
+    draw_str_2x(585, logo_y + crate::logo::LOGO_H + 8, "AIEONYX", 0x3A3A6A);
     // Sovereign tagline — subtle
-    draw_str(496, logo_y + crate::logo::LOGO_H + 28, "Sovereign Digital Infrastructure", 0x2A2A4A);
+    // tagline removed
 
     // Left glass panel
     draw_rounded_rect(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
     draw_rounded_border(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
     draw_hline(9, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
-    draw_str(24, TOP_BAR_H + 28, "IDENTITY", 0x44446A);
+    draw_str_16(20, TOP_BAR_H + 24, "IDENTITY", 0x44446A);
     draw_rect(20, TOP_BAR_H + 42, 32, 32, SOVEREIGN_PURPLE);
     blend_rect(20, TOP_BAR_H + 42, 32, 32, 0xFFFFFF, 20);
     // PL-49: show user name if set, else fallback to "E" + hex node_id
@@ -188,7 +189,7 @@ pub fn render_desktop(state: &DesktopState) {
         draw_str(60, TOP_BAR_H + 68, "Sovereign", 0x44446A);
     }
     draw_hline(16, TOP_BAR_H + 90, PANEL_W - 16, GLASS_BORDER);
-    draw_str(24, TOP_BAR_H + 108, "SPACES", 0x44446A);
+    draw_str_16(20, TOP_BAR_H + 104, "SPACES", 0x44446A);
     let space_labels: [&str; 4] = ["Desktop", "Files", "Onyxia", "EdisonDB"];
     let space_y: [u32; 4] = [
         TOP_BAR_H + 116, TOP_BAR_H + 142,
@@ -225,7 +226,7 @@ pub fn render_desktop(state: &DesktopState) {
     draw_rounded_rect(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_PANEL);
     draw_rounded_border(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
     draw_hline(rx + 1, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
-    draw_str(rx + 16, TOP_BAR_H + 28, "SYSTEM", 0x44446A);
+    draw_str_16(rx + 12, TOP_BAR_H + 24, "SYSTEM", 0x44446A);
     let icon_labels: [&str; 6] = ["O","F","S","A","D","N"];
     let icon_colors: [u32; 6] = [SOVEREIGN_PURPLE,0x1850A0,SETTINGS_BLUE,0x331A4A,BROWSE_GREEN,ACCENT_TEAL]; // A dimmed=stub, N=teal(Network wired)
     let mut ii = 0u32;
