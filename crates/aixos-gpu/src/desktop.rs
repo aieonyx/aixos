@@ -469,6 +469,7 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
                 2 => 4, // EDB  -> D
                 3 => 6, // Set  -> S
                 4 => 4, // EDB browser -> D
+                7 => 0, // Onyxia browser -> O (diamond icon)
                 _ => 0,
             };
             let dot_x = dock_x + 10 + dock_idx * (icon_w + icon_gap) + icon_w / 2 - 3;
@@ -801,3 +802,142 @@ pub fn clear_window() {
     let wy = unsafe { CUR_WIN_Y as u32 };
     draw_rect(wx.saturating_sub(2), wy.saturating_sub(2), WIN_W + 10, WIN_H + 4, DARK_BG);
 }
+
+// ── PL-60: Onyxia Browser Window ─────────────────────────────────────────────
+// Sovereign awp:// browser — URL bar + page canvas placeholder.
+// url_buf/url_len: the current URL being typed or displayed.
+// url_focused: true when the URL bar has keyboard focus.
+// loaded: true after Enter pressed — shows "page loaded" state.
+pub fn render_onyxia_browser(
+    wx: i32, wy: i32, w: u32, h: u32,
+    url_buf: &[u8], url_len: usize,
+    url_focused: bool,
+    loaded: bool,
+) {
+    let wx_u = wx as u32;
+    let wy_u = wy as u32;
+
+    // ── URL bar row (below title bar) ────────────────────────────────────────
+    let bar_y = wy_u + WIN_TITLE_H + 2;
+    let bar_h: u32 = 22;
+
+    // URL bar background — dark panel
+    draw_rect(wx_u + 1, bar_y, w - 2, bar_h, 0x0A0818);
+
+    // Back / forward stub buttons (◀ ▶) — purely decorative at PL-60
+    draw_rounded_rect(wx_u + 4,  bar_y + 3, 14, 16, 2, 0x1A1A3A);
+    draw_rounded_rect(wx_u + 20, bar_y + 3, 14, 16, 2, 0x1A1A3A);
+    draw_str(wx_u + 7,  bar_y + 11, "<", TEXT_DIM);
+    draw_str(wx_u + 23, bar_y + 11, ">", TEXT_DIM);
+
+    // Reload button stub (circle arrow ↺)
+    draw_rounded_rect(wx_u + 38, bar_y + 3, 14, 16, 2, 0x1A1A3A);
+    draw_str(wx_u + 41, bar_y + 11, "o", TEXT_DIM);
+
+    // awp:// scheme badge
+    let badge_x = wx_u + 56;
+    draw_rounded_rect(badge_x, bar_y + 4, 30, 14, 2, 0x0D2A1A);
+    draw_border(badge_x, bar_y + 4, 30, 14, ACCENT_TEAL);
+    draw_str(badge_x + 3, bar_y + 12, "awp", ACCENT_TEAL);
+
+    // URL input field
+    let field_x = badge_x + 34;
+    let field_w = if w > field_x - wx_u + 8 { w - (field_x - wx_u) - 8 } else { 4 };
+    let border_col = if url_focused { ACCENT_TEAL } else { 0x2A2848 };
+    draw_rect(field_x, bar_y + 3, field_w, 16, 0x06060F);
+    draw_border(field_x, bar_y + 3, field_w, 16, border_col);
+
+    // URL text
+    let text_x = field_x + 4;
+    let text_y = bar_y + 11;
+    if url_len > 0 {
+        if let Ok(txt) = core::str::from_utf8(&url_buf[..url_len]) {
+            draw_str_clipped(text_x, text_y, txt, TEXT_WHITE, field_x + field_w - 4);
+        }
+    } else if !url_focused {
+        draw_str_clipped(text_x, text_y, "awp://", TEXT_DIM, field_x + field_w - 4);
+    }
+    // Cursor blink
+    if url_focused {
+        let cur_x = text_x + (url_len as u32) * 8;
+        draw_rect(cur_x.min(field_x + field_w - 6), text_y - 1, 2, 12, ACCENT_TEAL);
+    }
+
+    // Separator under URL bar
+    let sep_y = bar_y + bar_h;
+    draw_hline(wx_u + 1, sep_y, w - 2, ACCENT_TEAL);
+
+    // ── Page canvas area ─────────────────────────────────────────────────────
+    let canvas_top = sep_y + 1;
+    let canvas_h = if h > canvas_top - wy_u + 2 { h - (canvas_top - wy_u) - 2 } else { 4 };
+
+    // Page background
+    draw_rect(wx_u + 1, canvas_top, w - 2, canvas_h, WIN_BG);
+    blend_rect(wx_u + 1, canvas_top, w - 2, canvas_h, SOVEREIGN_PURPLE, 8);
+
+    if loaded && url_len > 0 {
+        // ── Loaded state: render sovereign page stub ──────────────────────────
+        // Page top accent bar
+        draw_hline(wx_u + 1, canvas_top, w - 2, SOVEREIGN_PURPLE);
+
+        // Address confirmation line
+        let conf_y = canvas_top + 10;
+        draw_str_clipped(wx_u + 12, conf_y, "Navigating to:", TEXT_DIM, wx_u + w - 8);
+        let url_y = conf_y + 14;
+        if let Ok(txt) = core::str::from_utf8(&url_buf[..url_len]) {
+            draw_str_16_clipped(wx_u + 12, url_y, txt, ACCENT_TEAL, wx_u + w - 8);
+        }
+        draw_hline(wx_u + 12, url_y + 17, (url_len as u32 * 9).min(w - 24), ACCENT_TEAL);
+
+        // Status badge
+        let badge2_y = url_y + 26;
+        draw_rounded_rect(wx_u + 12, badge2_y, 80, 14, 3, 0x0D2A1A);
+        draw_border(wx_u + 12, badge2_y, 80, 14, ACCENT_TEAL);
+        draw_str(wx_u + 16, badge2_y + 8, "AWP/0.1", ACCENT_TEAL);
+
+        // HANIEL placeholder text
+        let msg_y = badge2_y + 30;
+        draw_str_clipped(wx_u + 12, msg_y,
+            "HANIEL canvas: wiring in PL-61", TEXT_DIM, wx_u + w - 8);
+        draw_str_clipped(wx_u + 12, msg_y + 14,
+            "Full render: PL-62+ compositor", TEXT_DIM, wx_u + w - 8);
+
+        // Sovereignty watermark — bottom-right of page canvas
+        let wm_y = canvas_top + canvas_h - 16;
+        draw_str_clipped(wx_u + w - 130, wm_y,
+            "AIEONYX sovereign node", 0x2A2848, wx_u + w - 4);
+    } else {
+        // ── Unloaded state: new tab sovereign splash ──────────────────────────
+        // AIEONYX wordmark centred in canvas
+        let mid_y = canvas_top + canvas_h / 2;
+
+        // Diamond logo (small, centred) — 5-row hline ◇
+        let logo_x = wx_u + w / 2 - 8;
+        let logo_y = mid_y - 30;
+        draw_hline(logo_x + 7, logo_y,     2, SOVEREIGN_PURPLE);
+        draw_hline(logo_x + 5, logo_y + 1, 6, SOVEREIGN_PURPLE);
+        draw_hline(logo_x + 3, logo_y + 2, 10, SOVEREIGN_PURPLE);
+        draw_hline(logo_x + 5, logo_y + 3, 6, SOVEREIGN_PURPLE);
+        draw_hline(logo_x + 7, logo_y + 4, 2, SOVEREIGN_PURPLE);
+
+        // Tagline
+        draw_str_clipped(wx_u + w / 2 - 38, mid_y - 14,
+            "Onyxia Browser", TEXT_DIM, wx_u + w - 8);
+        draw_str_16_clipped(wx_u + w / 2 - 54, mid_y,
+            "awp:// sovereign web", SOVEREIGN_PURPLE, wx_u + w - 8);
+
+        // Hint line
+        draw_str_clipped(wx_u + w / 2 - 76, mid_y + 22,
+            "Tab = focus URL  Enter = navigate  Esc = clear", 0x2A2848, wx_u + w - 8);
+    }
+
+    // Resize handle
+    draw_rect(wx_u + w - 12, wy_u + h - 12, 12, 12, ACCENT_TEAL);
+    draw_rect(wx_u + w - 8,  wy_u + h - 8,  4,  4,  TEXT_WHITE);
+
+    // [focused] badge if URL bar active
+    if url_focused {
+        draw_str_16(wx_u + w - 80, bar_y + 11, "[focused]", TEXT_DIM);
+    }
+}
+

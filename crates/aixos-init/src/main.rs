@@ -432,6 +432,10 @@ static mut EDB_CURSOR: usize = 0;
 static mut EDB_SCROLL: usize = 0;
 static mut EDB_INPUT: ShellBuf = ShellBuf::new();
 static mut EDB_FOCUSED: bool = false;
+// PL-60: Onyxia browser state
+static mut ONY_URL_BUF: ShellBuf = ShellBuf::new();
+static mut ONY_URL_FOCUSED: bool = false;
+static mut ONY_LOADED: bool = false;
 static mut FILES_CURSOR: usize = 0;
 static mut FILES_VIEWING: bool = false;
 static mut FILES_VIEW_IDX: usize = 0;
@@ -776,6 +780,20 @@ fn render_window_for_slot(i: usize) {
                   "Status: isolated  local only"],
                 w.w, w.h)
         }
+        // PL-60: Onyxia Browser — awp:// sovereign browser window
+        7 => {
+            unsafe {
+                let url = &*core::ptr::addr_of!(ONY_URL_BUF);
+                let focused = ONY_URL_FOCUSED && ACTIVE_WIN == i;
+                aixos_gpu::desktop::render_window("Onyxia Browser", &[], w.w, w.h);
+                aixos_gpu::desktop::render_onyxia_browser(
+                    w.x, w.y, w.w, w.h,
+                    url.as_slice(), url.len,
+                    focused,
+                    ONY_LOADED,
+                );
+            }
+        }
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
@@ -887,8 +905,8 @@ fn handle_dock_click(x: i32, y: i32) {
         // Dock index -> window kind
         // 0=O(Onyxia) 1=W(Browser) 2=>_(Shell) 3=F(Files/EDB) 4=D(EDB Browser) 5=I(IAM/Set) 6=S(Settings)
         let kind: u8 = match icon {
-            0 => 0, // Onyxia -> Node window (placeholder)
-            1 => 0, // Browser -> Node window (placeholder)
+            0 => 7, // Onyxia -> Onyxia Browser
+            1 => 7, // Browser -> Onyxia Browser (same window)
             2 => 1, // Shell
             3 => 6, // Files -> AXFS Files window
             4 => 4, // EDB Browser
@@ -911,6 +929,11 @@ fn handle_dock_click(x: i32, y: i32) {
                 // If no free slot, do nothing (all 5 windows open)
             }
             if kind == 1 || kind == 6 { WINDOW_FOCUSED = true; }
+            if kind == 7 {
+                // Onyxia browser: reset to new tab state if freshly opened
+                ONY_URL_FOCUSED = false;
+                ONY_LOADED = false;
+            }
             if kind == 4 {
                 EDB_CURSOR = 0;
                 EDB_SCROLL = 0;
@@ -1017,6 +1040,62 @@ fn handle_edb_key(code: u16, ch: Option<char>) {
     }
 }
 
+// PL-60: Onyxia browser keyboard handler
+// Tab (15)   — toggle URL bar focus
+// Enter (28) — navigate (set ONY_LOADED=true)
+// Esc (1)    — if URL focused: clear URL. If not focused: close window
+// Backspace (14) — delete char from URL
+// Char       — type into URL bar when focused
+fn handle_onyxia_key(code: u16, ch: Option<char>) {
+    unsafe {
+        match code {
+            15 => {
+                // Tab: toggle URL focus
+                ONY_URL_FOCUSED = !ONY_URL_FOCUSED;
+                render_all_windows();
+            }
+            28 => {
+                // Enter: navigate
+                if ONY_URL_FOCUSED && ONY_URL_BUF.len > 0 {
+                    ONY_LOADED = true;
+                    ONY_URL_FOCUSED = false;
+                }
+                render_all_windows();
+            }
+            1 => {
+                // Esc: if URL focused → clear URL. Else → close window.
+                if ONY_URL_FOCUSED {
+                    ONY_URL_BUF.clear();
+                    ONY_LOADED = false;
+                    ONY_URL_FOCUSED = false;
+                } else {
+                    if let Some(i) = find_kind(7) {
+                        wins()[i].open = false;
+                    }
+                    WINDOW_FOCUSED = false;
+                }
+                render_all_windows();
+            }
+            14 => {
+                // Backspace
+                if ONY_URL_FOCUSED {
+                    ONY_URL_BUF.pop();
+                    ONY_LOADED = false;
+                }
+                render_all_windows();
+            }
+            _ => {
+                if ONY_URL_FOCUSED {
+                    if let Some(c) = ch {
+                        ONY_URL_BUF.push(c as u8);
+                    }
+                    render_all_windows();
+                }
+            }
+        }
+    }
+}
+
 fn handle_window_key(code: u16, ch: Option<char>) {
     unsafe {
         if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 6 {
@@ -1025,6 +1104,11 @@ fn handle_window_key(code: u16, ch: Option<char>) {
         }
         if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 4 {
             handle_edb_key(code, ch);
+            return;
+        }
+        // PL-60: Onyxia browser gets its own key handler
+        if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 7 {
+            handle_onyxia_key(code, ch);
             return;
         }
     }
@@ -1108,6 +1192,11 @@ fn handle_click(x: i32, y: i32) {
                 ACTIVE_WIN = i;
                 if w.kind == 1 {
                     WINDOW_FOCUSED = true;
+                }
+                if w.kind == 7 {
+                    // Onyxia: clicking inside canvas body focuses URL bar
+                    WINDOW_FOCUSED = true;
+                    ONY_URL_FOCUSED = true;
                 }
                 if w.kind == 4 { EDB_FOCUSED = true; }
                 render_all_windows();
@@ -1297,6 +1386,11 @@ fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
             return;
         }
         if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 4 {
+            handle_window_key(code, ch);
+            return;
+        }
+        // PL-60: Onyxia browser key dispatch
+        if wins()[ACTIVE_WIN].open && wins()[ACTIVE_WIN].kind == 7 {
             handle_window_key(code, ch);
             return;
         }
