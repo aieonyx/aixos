@@ -16,7 +16,7 @@
 pub const MAX_PROCS: usize = 8;
 
 /// Cooperative process state.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u8)]
 pub enum ProcState {
     Empty   = 0, // slot unused
