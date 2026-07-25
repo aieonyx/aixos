@@ -313,7 +313,7 @@ pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day:
 }
 
 
-pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
+pub fn render_taskbar(slots: &[(bool, u8, bool)], active: usize) {
     draw_rect(0, DOCK_Y, 1280, DOCK_H, 0x0A0818);
     draw_hline(0, DOCK_Y, 1280, 0x1A1830);
     // 7 icons x 34px + 6px gap = 280px icons
@@ -458,11 +458,12 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
     // axos> prompt — right of separator, vertically centered
     draw_str(sep_x + 8, dock_py + 22, "axos>", 0x555570);
     draw_rect(sep_x + 52, dock_py + 13, 5, 12, SOVEREIGN_PURPLE);
-    // Open window indicators — teal dot above icon
+    // Open window indicators — teal dot = open, amber dot = minimized
     let mut wi = 0usize;
     while wi < slots.len() {
         if slots[wi].0 {
             let kind = slots[wi].1 as u32;
+            let minimized = slots[wi].2;
             // Map window kind to dock icon index
             let dock_idx: u32 = match kind {
                 1 => 2, // Shell -> >_
@@ -474,7 +475,8 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
                 _ => 0,
             };
             let dot_x = dock_x + 10 + dock_idx * (icon_w + icon_gap) + icon_w / 2 - 3;
-            draw_rect(dot_x, dock_py + 2, 6, 2, ACCENT_TEAL);
+            let dot_col = if minimized { ACCENT_AMBER } else { ACCENT_TEAL };
+            draw_rect(dot_x, dock_py + 2, 6, 2, dot_col);
         }
         wi += 1;
     }
@@ -583,13 +585,29 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_hline(tx.saturating_sub(2), ty + 2,               5, SOVEREIGN_PURPLE);
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
-    draw_str_16_clipped(wx + 24, wy + 4, title, TEXT_WHITE, wx + w - 24);
+    draw_str_16_clipped(wx + 24, wy + 4, title, TEXT_WHITE, wx + w - 52);
+    // Close button (red) — rightmost
     let cx = wx + w - 18;
     let cy = wy + 7;
     draw_rect(cx, cy, 10, 10, CLOSE_RED);
     blend_rect(cx, cy, 10, 5, 0xFFFFFF, 40);
     draw_border(cx, cy, 10, 10, 0x8B1A1A);
     draw_str(cx + 2, cy + 1, "x", TEXT_WHITE);
+    // Maximize button (teal □) — left of close
+    let mx = cx - 16;
+    draw_rect(mx, cy, 10, 10, 0x1A3A3A);
+    blend_rect(mx, cy, 10, 5, 0xFFFFFF, 30);
+    draw_border(mx, cy, 10, 10, ACCENT_TEAL);
+    draw_rect(mx + 2, cy + 2, 6, 1, ACCENT_TEAL); // top inner bar
+    draw_rect(mx + 2, cy + 3, 1, 5, ACCENT_TEAL); // left inner
+    draw_rect(mx + 7, cy + 3, 1, 5, ACCENT_TEAL); // right inner
+    draw_rect(mx + 2, cy + 7, 6, 1, ACCENT_TEAL); // bottom inner
+    // Minimize button (amber _) — left of maximize
+    let mnx = mx - 16;
+    draw_rect(mnx, cy, 10, 10, 0x2A1A00);
+    blend_rect(mnx, cy, 10, 5, 0xFFFFFF, 20);
+    draw_border(mnx, cy, 10, 10, ACCENT_AMBER);
+    draw_rect(mnx + 2, cy + 6, 6, 2, ACCENT_AMBER); // _ underline
     draw_hline(wx, wy + WIN_TITLE_H, w, ACCENT_TEAL);
     draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
     blend_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, SOVEREIGN_PURPLE, 12);
@@ -796,6 +814,23 @@ pub fn clear_window_sized(w: u32, h: u32) {
     let wx = unsafe { CUR_WIN_X as u32 };
     let wy = unsafe { CUR_WIN_Y as u32 };
     draw_rect(wx.saturating_sub(2), wy.saturating_sub(2), w + 4, h + 4, DARK_BG);
+}
+
+/// PL-63: Query which title bar control was clicked.
+/// Returns: 0=none, 1=close, 2=maximize, 3=minimize
+pub fn title_bar_hit(wx: i32, wy: i32, w: u32, click_x: i32, click_y: i32) -> u8 {
+    let title_h = WIN_TITLE_H as i32;
+    if click_y < wy || click_y > wy + title_h { return 0; }
+    let cx = wx + w as i32 - 18; // close x
+    let cy = wy + 7;
+    let mx = cx - 16;            // maximize x
+    let mnx = mx - 16;           // minimize x
+    let btn_y = cy;
+    let in_y = click_y >= btn_y && click_y < btn_y + 10;
+    if in_y && click_x >= cx && click_x < cx + 10 { return 1; } // close
+    if in_y && click_x >= mx && click_x < mx + 10 { return 2; } // maximize
+    if in_y && click_x >= mnx && click_x < mnx + 10 { return 3; } // minimize
+    0
 }
 
 pub fn clear_window() {

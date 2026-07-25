@@ -441,17 +441,31 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 
 
 #[derive(Clone, Copy)]
-struct WinSlot { open: bool, kind: u8, x: i32, y: i32, w: u32, h: u32 }
+// PL-63: WinSlot expanded with minimize/maximize state
+struct WinSlot {
+    open: bool, kind: u8,
+    x: i32, y: i32, w: u32, h: u32,
+    minimized: bool,
+    maximized: bool,
+    prev_x: i32, prev_y: i32, prev_w: u32, prev_h: u32,
+}
+impl WinSlot {
+    const fn new(x: i32, y: i32) -> Self {
+        WinSlot { open: false, kind: 0, x, y, w: 580, h: 300,
+            minimized: false, maximized: false,
+            prev_x: x, prev_y: y, prev_w: 580, prev_h: 300 }
+    }
+}
 // PL-59.5: spawn positions clamp to canvas safe zone
 //   x ∈ [CANVAS_X_MIN(200), ~880]  y ∈ [CANVAS_Y_MIN(50), CANVAS_Y_MAX(370)]
 //   Cascade: +25 per slot so stacked windows are visible
 static mut WINS: [WinSlot; 6] = [
-    WinSlot { open: false, kind: 0, x: 210, y: 60,  w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 235, y: 85,  w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 260, y: 110, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 285, y: 135, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 310, y: 160, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 335, y: 185, w: 580, h: 300 },
+    WinSlot::new(210, 60),
+    WinSlot::new(235, 85),
+    WinSlot::new(260, 110),
+    WinSlot::new(285, 135),
+    WinSlot::new(310, 160),
+    WinSlot::new(335, 185),
 ];
 static mut ACTIVE_WIN: usize = 0;
 static mut DRAG_WIN: usize = 0;
@@ -696,11 +710,11 @@ pub extern "C" fn aixos_main() -> ! {
             unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset); }
             {
                 let slots = unsafe {[
-                    (wins()[0].open, wins()[0].kind),
-                    (wins()[1].open, wins()[1].kind),
-                    (wins()[2].open, wins()[2].kind),
-                    (wins()[3].open, wins()[3].kind),
-                    (wins()[4].open, wins()[4].kind),
+                    (wins()[0].open, wins()[0].kind, wins()[0].minimized),
+                    (wins()[1].open, wins()[1].kind, wins()[1].minimized),
+                    (wins()[2].open, wins()[2].kind, wins()[2].minimized),
+                    (wins()[3].open, wins()[3].kind, wins()[3].minimized),
+                    (wins()[4].open, wins()[4].kind, wins()[4].minimized),
                 ]};
                 aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
             }
@@ -751,8 +765,8 @@ fn active_kind() -> u8 {
 
 fn render_window_for_slot(i: usize) {
     let w = wins()[i];
-    if !w.open {
-        return;
+    if !w.open || w.minimized {
+        return; // minimized windows are hidden — shown only as dock dot
     }
     aixos_gpu::desktop::set_window_pos(w.x, w.y);
     match w.kind {
@@ -957,12 +971,12 @@ fn render_windows_only() {
     }
     render_window_for_slot(active);
     let slots = unsafe {[
-        (wins()[0].open, wins()[0].kind),
-        (wins()[1].open, wins()[1].kind),
-        (wins()[2].open, wins()[2].kind),
-        (wins()[3].open, wins()[3].kind),
-        (wins()[4].open, wins()[4].kind),
-        (wins()[5].open, wins()[5].kind),
+        (wins()[0].open, wins()[0].kind, wins()[0].minimized),
+        (wins()[1].open, wins()[1].kind, wins()[1].minimized),
+        (wins()[2].open, wins()[2].kind, wins()[2].minimized),
+        (wins()[3].open, wins()[3].kind, wins()[3].minimized),
+        (wins()[4].open, wins()[4].kind, wins()[4].minimized),
+        (wins()[5].open, wins()[5].kind, wins()[5].minimized),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
     // PL-48: redraw cursor to prevent ghost artifact after panel redraws
@@ -1000,12 +1014,12 @@ fn render_all_windows() {
     }
     render_window_for_slot(active);
     let slots = unsafe {[
-        (wins()[0].open, wins()[0].kind),
-        (wins()[1].open, wins()[1].kind),
-        (wins()[2].open, wins()[2].kind),
-        (wins()[3].open, wins()[3].kind),
-        (wins()[4].open, wins()[4].kind),
-        (wins()[5].open, wins()[5].kind),
+        (wins()[0].open, wins()[0].kind, wins()[0].minimized),
+        (wins()[1].open, wins()[1].kind, wins()[1].minimized),
+        (wins()[2].open, wins()[2].kind, wins()[2].minimized),
+        (wins()[3].open, wins()[3].kind, wins()[3].minimized),
+        (wins()[4].open, wins()[4].kind, wins()[4].minimized),
+        (wins()[5].open, wins()[5].kind, wins()[5].minimized),
     ]};
     aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
     // PL-48: redraw cursor to prevent ghost artifact after full clear
@@ -1043,8 +1057,13 @@ fn handle_dock_click(x: i32, y: i32) {
         unsafe {
             WINDOW_FOCUSED = false;
             if let Some(i) = find_kind(kind) {
-                // Already open — bring to front
-                ACTIVE_WIN = i;
+                // Already open — if minimized, restore it; else bring to front
+                if wins()[i].minimized {
+                    wins()[i].minimized = false;
+                    ACTIVE_WIN = i;
+                } else {
+                    ACTIVE_WIN = i;
+                }
             } else {
                 // Open in a free slot
                 if let Some(slot) = find_free() {
@@ -1482,22 +1501,70 @@ fn handle_click(x: i32, y: i32) {
             }
             if x >= w.x && x < w.x + w.w as i32 && y >= w.y && y < w.y + 24 {
                 ACTIVE_WIN = i;
-                if x >= w.x + w.w as i32 - 22 && x < w.x + w.w as i32 - 6 {
-                    wins()[i].open = false;
-                    WINDOW_FOCUSED = false;
-                    aixos_gpu::desktop::set_window_pos(w.x, w.y);
-                    aixos_gpu::desktop::clear_window();
-                    let mut j = 6;
-                    while j > 0 { j -= 1; if wins()[j].open { ACTIVE_WIN = j; break; } }
-                    render_all_windows();
-                    return;
+                let hit = aixos_gpu::desktop::title_bar_hit(w.x, w.y, w.w, x, y);
+                match hit {
+                    1 => {
+                        // Close
+                        wins()[i].open = false;
+                        wins()[i].minimized = false;
+                        wins()[i].maximized = false;
+                        WINDOW_FOCUSED = false;
+                        aixos_gpu::desktop::set_window_pos(w.x, w.y);
+                        aixos_gpu::desktop::clear_window();
+                        let mut j = 6;
+                        while j > 0 { j -= 1; if wins()[j].open { ACTIVE_WIN = j; break; } }
+                        render_all_windows();
+                        return;
+                    }
+                    2 => {
+                        // Maximize / restore
+                        if wins()[i].maximized {
+                            // Restore
+                            wins()[i].x = wins()[i].prev_x;
+                            wins()[i].y = wins()[i].prev_y;
+                            wins()[i].w = wins()[i].prev_w;
+                            wins()[i].h = wins()[i].prev_h;
+                            wins()[i].maximized = false;
+                        } else {
+                            // Maximize to canvas area
+                            wins()[i].prev_x = wins()[i].x;
+                            wins()[i].prev_y = wins()[i].y;
+                            wins()[i].prev_w = wins()[i].w;
+                            wins()[i].prev_h = wins()[i].h;
+                            wins()[i].x = aixos_gpu::desktop::CANVAS_X_MIN;
+                            wins()[i].y = aixos_gpu::desktop::CANVAS_Y_MIN;
+                            wins()[i].w = 880;
+                            wins()[i].h = 620;
+                            wins()[i].maximized = true;
+                            wins()[i].minimized = false;
+                        }
+                        render_all_windows();
+                        return;
+                    }
+                    3 => {
+                        // Minimize — hide window, show dot in dock
+                        wins()[i].minimized = true;
+                        WINDOW_FOCUSED = false;
+                        aixos_gpu::desktop::set_window_pos(w.x, w.y);
+                        aixos_gpu::desktop::clear_window_sized(w.w + 10, w.h + 10);
+                        // Focus next open non-minimized window
+                        let mut j = 6;
+                        while j > 0 { j -= 1;
+                            if wins()[j].open && !wins()[j].minimized { ACTIVE_WIN = j; break; }
+                        }
+                        render_all_windows();
+                        return;
+                    }
+                    _ => {
+                        // Drag — only if not on a button
+                        DRAG_WIN = i;
+                        DRAG_ACTIVE = true;
+                        DRAG_OFF_X = x - w.x;
+                        DRAG_OFF_Y = y - w.y;
+                        render_all_windows();
+                        return;
+                    }
                 }
-                DRAG_WIN = i;
-                DRAG_ACTIVE = true;
-                DRAG_OFF_X = x - w.x;
-                DRAG_OFF_Y = y - w.y;
-                render_all_windows();
-                return;
             }
             if x >= w.x && x < w.x + w.w as i32 && y >= w.y + 24 && y < w.y + w.h as i32 {
                 ACTIVE_WIN = i;
