@@ -22,14 +22,19 @@
 //
 // Conformance oracle: axon_interp output == AArch64 native codegen output (P71 target)
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// PL-62: Always no_std core — std feature only adds host-side extras.
+// Unconditional core imports ensure bare-metal aarch64 compilation.
+#![no_std]
 #![allow(dead_code)]
 
-// PL-62: bare-metal no_std prelude — required when std feature is disabled
-#[cfg(not(feature = "std"))]
 use core::prelude::rust_2021::*;
-#[cfg(not(feature = "std"))]
-use core::{cmp::Ord, iter::Iterator, option::Option::{self, Some, None}};
+use core::cmp::Ord;
+use core::iter::Iterator;
+use core::option::Option::{self, Some, None};
+
+// std feature: bring in std for host-side test/REPL builds
+#[cfg(feature = "std")]
+extern crate std;
 
 pub const MAX_LINES:    usize = 64;   // doubled from PL-59.1 (was 32)
 pub const MAX_VARS:     usize = 16;   // doubled (was 8)
@@ -139,7 +144,7 @@ impl AxResult {
     pub fn set_error(&mut self, line_num: usize, msg: &[u8]) {
         self.error = true;
         self.error_line = line_num;
-        let len = msg.len().min(63);
+        let len = { let l = msg.len(); if l < 63 { l } else { 63 } };
         self.error_msg[..len].copy_from_slice(&msg[..len]);
         self.error_msg_len = len;
     }
@@ -169,7 +174,10 @@ pub fn starts_with(s: &[u8], prefix: &[u8]) -> bool {
 }
 
 pub fn bytes_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x == y)
+    if a.len() != b.len() { return false; }
+    let mut i = 0;
+    while i < a.len() { if a[i] != b[i] { return false; } i += 1; }
+    true
 }
 
 pub fn parse_i64(s: &[u8]) -> Option<i64> {
@@ -200,7 +208,7 @@ pub fn find_var(vars: &[AxVar], name: &[u8]) -> Option<i64> {
 }
 
 pub fn set_var(vars: &mut [AxVar; MAX_VARS], name: &[u8], value: i64) -> bool {
-    let nlen = name.len().min(VAR_NAME_LEN);
+    let nlen = { let l = name.len(); if l < VAR_NAME_LEN { l } else { VAR_NAME_LEN } };
     // update existing
     for v in vars.iter_mut() {
         if v.name_len == nlen && v.name[..nlen] == name[..nlen] {
@@ -296,7 +304,7 @@ pub fn exec_line(
     // let x = expr
     if starts_with(line, b"let ") {
         let rest = trim(&line[4..]);
-        let eq = rest.iter().position(|&b| b == b'=');
+        let eq = { let mut found = None; let mut i = 0; while i < rest.len() { if rest[i] == b'=' { found = Some(i); break; } i += 1; } found };
         let Some(eq) = eq else {
             result.set_error(line_num, b"let: missing '='");
             return;
