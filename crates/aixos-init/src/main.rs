@@ -36,7 +36,7 @@ impl ShellBuf {
 
 fn hist_push(buf: &ShellBuf) { unsafe { if buf.len == 0 { return; } let slot = HIST_COUNT % HIST_SIZE; HIST[slot] = buf.data; HIST_LEN[slot] = buf.len; HIST_COUNT += 1; HIST_NAV = 0; TAB_ACTIVE = false; } }
 fn hist_nav(buf: &mut ShellBuf, older: bool) { unsafe { let total = HIST_COUNT.min(HIST_SIZE); if total == 0 { return; } if older { if HIST_NAV < total { HIST_NAV += 1; } } else { if HIST_NAV > 0 { HIST_NAV -= 1; } } if HIST_NAV == 0 { buf.clear(); return; } let idx = (HIST_COUNT.wrapping_sub(HIST_NAV)) % HIST_SIZE; buf.data = HIST[idx]; buf.len = HIST_LEN[idx]; } }
-const CMDS: &[&[u8]] = &[b"help",b"clear",b"version",b"db",b"window",b"settings",b"browse",b"close",b"reboot",b"tz",b"name",b"ls",b"cat",b"write",b"awp",b"awp recv",b"mem",b"node-id",b"sovereignty",b"awp-status",b"run",b"ps",b"spawn",b"kill"];
+const CMDS: &[&[u8]] = &[b"help",b"clear",b"version",b"db",b"window",b"settings",b"browse",b"close",b"reboot",b"tz",b"name",b"ls",b"cat",b"write",b"awp",b"awp recv",b"mem",b"node-id",b"sovereignty",b"awp-status",b"run",b"ps",b"spawn",b"kill",b"run_verified",b"mkpkg",b"verify"];
 fn tab_complete(buf: &mut ShellBuf) { unsafe { let prefix = &buf.data[..buf.len]; let mut matches = [0usize;20]; let mut mc=0usize; let mut ci=0; while ci<CMDS.len() { let cmd=CMDS[ci]; if cmd.len()>=prefix.len() && &cmd[..prefix.len()]==prefix { if mc<20{matches[mc]=ci;mc+=1;} } ci+=1; } if mc==0{TAB_ACTIVE=false;TAB_CYCLE=0;return;} let pick=if !TAB_ACTIVE{TAB_CYCLE=0;0}else{let t=TAB_CYCLE%mc;TAB_CYCLE=(TAB_CYCLE+1)%mc;t}; TAB_ACTIVE=true; let cmd=CMDS[matches[pick]]; let len=cmd.len().min(63); let mut i=0; while i<len{buf.data[i]=cmd[i];i+=1;} buf.len=len; } }
 fn execute_cmd(buf: &ShellBuf) -> &'static str {
     let cmd = buf.as_slice();
@@ -234,6 +234,120 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
                     }
                 } else { "axon: read error" }
             } else { "axon: file not found" }
+        }
+        // PL-64: verify — check a .axpkg file integrity + capabilities
+        cmd if cmd.starts_with(b"verify ") && cmd.len() > 7 => {
+            let fname = &cmd[7..];
+            if let Some(idx) = aixos_axfs::find(fname) {
+                if let Some(f) = aixos_axfs::file_at(idx) {
+                    let data = f.data_bytes();
+                    match aixos_kernel::verify::verify_axpkg(data) {
+                        aixos_kernel::verify::VerifyGate::Pass { name, script, caps } => {
+                            unsafe {
+                                static mut VER_BUF: [u8; 128] = [0u8; 128];
+                                let b = &mut *core::ptr::addr_of_mut!(VER_BUF);
+                                let ok = b"PASS name:";
+                                let mut pos = 0usize;
+                                let mut i = 0; while i < ok.len() { b[pos]=ok[i]; pos+=1; i+=1; }
+                                let nl = name.len().min(32);
+                                i=0; while i < nl { b[pos]=name[i]; pos+=1; i+=1; }
+                                let s2 = b" script:";
+                                i=0; while i<s2.len(){b[pos]=s2[i];pos+=1;i+=1;}
+                                // script len as decimal
+                                let mut tmp=[0u8;8]; let mut tl=0; let mut n=script.len();
+                                if n==0{b[pos]=b'0';pos+=1;}
+                                else{while n>0{tmp[tl]=b'0'+(n%10)as u8;tl+=1;n/=10;}let mut ti=tl;while ti>0{ti-=1;b[pos]=tmp[ti];pos+=1;}}
+                                let s3 = b"B caps:";
+                                i=0; while i<s3.len(){b[pos]=s3[i];pos+=1;i+=1;}
+                                // caps as hex
+                                let hex=b"0123456789abcdef";
+                                b[pos]=b'0'; pos+=1; b[pos]=b'x'; pos+=1;
+                                b[pos]=hex[((caps>>28)&0xf)as usize]; pos+=1;
+                                b[pos]=hex[((caps>>24)&0xf)as usize]; pos+=1;
+                                b[pos]=hex[((caps>>20)&0xf)as usize]; pos+=1;
+                                b[pos]=hex[((caps>>16)&0xf)as usize]; pos+=1;
+                                b[pos]=hex[((caps>>12)&0xf)as usize]; pos+=1;
+                                b[pos]=hex[((caps>>8)&0xf)as usize]; pos+=1;
+                                b[pos]=hex[((caps>>4)&0xf)as usize]; pos+=1;
+                                b[pos]=hex[(caps&0xf)as usize]; pos+=1;
+                                core::str::from_utf8_unchecked(&b[..pos])
+                            }
+                        }
+                        aixos_kernel::verify::VerifyGate::Reject(reason) => {
+                            reason.as_str()
+                        }
+                    }
+                } else { "verify: read error" }
+            } else { "verify: file not found" }
+        }
+        // PL-64: run_verified — verify .axpkg then execute if PASS
+        cmd if cmd.starts_with(b"run_verified ") && cmd.len() > 13 => {
+            let fname = &cmd[13..];
+            if let Some(idx) = aixos_axfs::find(fname) {
+                if let Some(f) = aixos_axfs::file_at(idx) {
+                    let data = f.data_bytes();
+                    match aixos_kernel::verify::verify_axpkg(data) {
+                        aixos_kernel::verify::VerifyGate::Pass { script, caps, .. } => {
+                            // Cap-gate AWP: only pass send callback if declared
+                            let awp_allowed = caps & aixos_kernel::verify::CAP_AWP_SEND != 0;
+                            let result = aixos_shell::axon_interp::exec(
+                                script,
+                                unsafe { aixos_identity::node_id() },
+                                if awp_allowed && aixos_net::virtio_net::is_live() {
+                                    Some(|node_id: u64, payload: &[u8]| aixos_net::virtio_net::send_awp_frame(node_id, payload))
+                                } else { None },
+                            );
+                            unsafe {
+                                let out = result.as_str();
+                                let len = out.len().min(510);
+                                AXFS_BUF_LEN = len;
+                                let mut i = 0; while i < len { AXFS_BUF[i] = out[i]; i += 1; }
+                                core::str::from_utf8_unchecked(&AXFS_BUF[..AXFS_BUF_LEN])
+                            }
+                        }
+                        aixos_kernel::verify::VerifyGate::Reject(reason) => {
+                            reason.as_str()
+                        }
+                    }
+                } else { "run_verified: read error" }
+            } else { "run_verified: file not found" }
+        }
+        // PL-64: mkpkg <name> <script_file> — pack a .axpkg from an AXFS .ax file
+        // Creates name.axpkg in AXFS with caps=0 (no special capabilities)
+        cmd if cmd.starts_with(b"mkpkg ") && cmd.len() > 6 => {
+            let rest = &cmd[6..];
+            // find space separator between name and filename
+            let sp = rest.iter().position(|&b| b == b' ').unwrap_or(rest.len());
+            let pkg_name = &rest[..sp];
+            let fname = if sp < rest.len() { &rest[sp+1..] } else { b"" as &[u8] };
+            if fname.is_empty() { "mkpkg: usage: mkpkg <pkgname> <script.ax>" }
+            else if let Some(idx) = aixos_axfs::find(fname) {
+                if let Some(f) = aixos_axfs::file_at(idx) {
+                    let script = f.data_bytes();
+                    unsafe {
+                        static mut PKG_BUF: [u8; 1024] = [0u8; 1024];
+                        let b = &mut *core::ptr::addr_of_mut!(PKG_BUF);
+                        let caps: u32 = 0; // no special capabilities
+                        match aixos_kernel::verify::pack_axpkg(pkg_name, script, caps, b) {
+                            Some(len) => {
+                                // Store packed bytes as AXFS file: "<name>.axpkg"
+                                static mut OUT_NAME: [u8; 72] = [0u8; 72];
+                                let on = &mut *core::ptr::addr_of_mut!(OUT_NAME);
+                                let nl = pkg_name.len().min(64);
+                                let mut i=0; while i<nl{on[i]=pkg_name[i];i+=1;}
+                                let suf = b".axpkg";
+                                let mut j=0; while j<suf.len(){on[nl+j]=suf[j];j+=1;}
+                                let out_name_len = nl + suf.len();
+                                // Write to AXFS
+                                let written = aixos_axfs::write(&on[..out_name_len], &b[..len]);
+                                if written { "mkpkg: package created" }
+                                else { "mkpkg: AXFS write failed" }
+                            }
+                            None => "mkpkg: package too large (max 1024 bytes)",
+                        }
+                    }
+                } else { "mkpkg: script read error" }
+            } else { "mkpkg: script file not found" }
         }
         // PL-58: awp recv
         b"awp recv" => {

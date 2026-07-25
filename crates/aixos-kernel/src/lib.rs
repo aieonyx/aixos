@@ -9,6 +9,7 @@ pub mod boot;
 pub mod virtio_blk;
 pub mod alloc;
 pub mod proc;
+pub mod verify;
 
 /// Boot-sequence contract implemented by each sovereign PD stub.
 pub trait SovereignBoot {
