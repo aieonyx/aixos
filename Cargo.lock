@@ -70,4 +70,9 @@ version = "0.1.0"
 dependencies = [
  "aixos-haniel",
  "aixos-kernel",
+ "axon_interp",
 ]
+
+[[package]]
+name = "axon_interp"
+version = "0.1.0"
