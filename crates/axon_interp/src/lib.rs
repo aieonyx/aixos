@@ -32,8 +32,8 @@ use core::cmp::Ord;
 use core::iter::Iterator;
 use core::option::Option::{self, Some, None};
 
-// std feature: bring in std for host-side test/REPL builds
-#[cfg(feature = "std")]
+// std feature: bring in std for host-side test/REPL builds (not on bare-metal)
+#[cfg(all(feature = "std", not(target_arch = "aarch64")))]
 extern crate std;
 
 pub const MAX_LINES:    usize = 64;   // doubled from PL-59.1 (was 32)
