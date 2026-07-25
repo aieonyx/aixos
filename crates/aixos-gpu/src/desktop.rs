@@ -808,11 +808,132 @@ pub fn clear_window() {
 // url_buf/url_len: the current URL being typed or displayed.
 // url_focused: true when the URL bar has keyboard focus.
 // loaded: true after Enter pressed — shows "page loaded" state.
+// ── PL-61: HANIEL Canvas Compositor ──────────────────────────────────────────
+// Sovereign document model for awp:// pages rendered inside Onyxia Browser.
+// All fields are &'static str — pages are compile-time sovereign content.
+
+pub const HANIEL_MAX_BODY:  usize = 12;
+pub const HANIEL_MAX_LINKS: usize = 6;
+
+pub struct HanielDoc {
+    pub title:      &'static str,
+    pub subtitle:   &'static str,
+    pub body:       [&'static str; HANIEL_MAX_BODY],
+    pub body_len:   usize,
+    pub links:      [&'static str; HANIEL_MAX_LINKS],
+    pub link_len:   usize,
+    /// 0 = normal, 1 = home/index, 2 = status/live, 3 = error
+    pub page_kind:  u8,
+}
+
+impl HanielDoc {
+    pub const fn empty() -> Self {
+        HanielDoc {
+            title: "", subtitle: "",
+            body: [""; HANIEL_MAX_BODY], body_len: 0,
+            links: [""; HANIEL_MAX_LINKS], link_len: 0,
+            page_kind: 0,
+        }
+    }
+}
+
+/// Render a HanielDoc into the Onyxia Browser page canvas.
+/// canvas_top / canvas_h define the drawable region inside the window.
+pub fn render_haniel_canvas(
+    wx_u: u32, canvas_top: u32, w: u32, canvas_h: u32,
+    doc: &HanielDoc,
+) {
+    // ── Page background ───────────────────────────────────────────────────────
+    draw_rect(wx_u + 1, canvas_top, w - 2, canvas_h, WIN_BG);
+
+    // Kind-specific accent tint
+    let tint: u32 = match doc.page_kind {
+        1 => SOVEREIGN_PURPLE, // home
+        2 => ACCENT_TEAL,      // status
+        3 => 0xA02020,         // error
+        _ => 0x181830,         // normal
+    };
+    blend_rect(wx_u + 1, canvas_top, w - 2, canvas_h, tint, 14);
+
+    // Top accent line
+    draw_hline(wx_u + 1, canvas_top, w - 2, tint);
+
+    // ── Page header ───────────────────────────────────────────────────────────
+    let hdr_y = canvas_top + 8;
+
+    // AWP badge
+    draw_rounded_rect(wx_u + 10, hdr_y, 28, 13, 2, 0x0D2A1A);
+    draw_border(wx_u + 10, hdr_y, 28, 13, ACCENT_TEAL);
+    draw_str(wx_u + 13, hdr_y + 8, "awp", ACCENT_TEAL);
+
+    // Title
+    let title_col: u32 = match doc.page_kind {
+        3 => 0xCC4444,
+        _ => TEXT_WHITE,
+    };
+    draw_str_16_clipped(wx_u + 44, hdr_y, doc.title, title_col, wx_u + w - 10);
+
+    // Subtitle
+    if !doc.subtitle.is_empty() {
+        draw_str_clipped(wx_u + 44, hdr_y + 18, doc.subtitle, TEXT_DIM, wx_u + w - 10);
+    }
+
+    // Header separator
+    let sep_y = hdr_y + 32;
+    draw_hline(wx_u + 10, sep_y, w - 20, PANEL_BORDER);
+
+    // ── Body text ─────────────────────────────────────────────────────────────
+    let body_y0 = sep_y + 6;
+    let row_h: u32 = 16;
+    let mut bi = 0usize;
+    while bi < doc.body_len {
+        let line = doc.body[bi];
+        let ly = body_y0 + bi as u32 * row_h;
+        // Section headers: lines starting with "##" render in teal, no prefix
+        if line.len() >= 2 && &line[..2] == "##" {
+            draw_str_clipped(wx_u + 10, ly, &line[2..], ACCENT_TEAL, wx_u + w - 10);
+        } else if line.len() >= 2 && &line[..2] == ">>" {
+            // Highlighted line: amber
+            draw_str_clipped(wx_u + 14, ly, &line[2..], ACCENT_AMBER, wx_u + w - 10);
+        } else {
+            draw_str_clipped(wx_u + 14, ly, line, TEXT_WHITE, wx_u + w - 10);
+        }
+        bi += 1;
+    }
+
+    // ── Link list ─────────────────────────────────────────────────────────────
+    if doc.link_len > 0 {
+        let links_y0 = if doc.body_len > 0 {
+            body_y0 + doc.body_len as u32 * row_h + 6
+        } else {
+            body_y0
+        };
+        // Separator before links
+        draw_hline(wx_u + 10, links_y0 - 3, w - 20, PANEL_BORDER);
+        let mut li = 0usize;
+        while li < doc.link_len {
+            let ly = links_y0 + li as u32 * 15;
+            // Link bullet
+            draw_rect(wx_u + 12, ly + 3, 4, 4, SOVEREIGN_PURPLE);
+            draw_str_clipped(wx_u + 20, ly, doc.links[li], SOVEREIGN_PURPLE, wx_u + w - 60);
+            draw_str(wx_u + w - 54, ly, "[Tab+Enter]", TEXT_DIM);
+            li += 1;
+        }
+    }
+
+    // ── Sovereign footer ──────────────────────────────────────────────────────
+    let foot_y = canvas_top + canvas_h - 14;
+    draw_hline(wx_u + 10, foot_y - 2, w - 20, PANEL_BORDER);
+    draw_str_clipped(wx_u + 12, foot_y, "AIEONYX Sovereign Digital Infrastructure", 0x222240, wx_u + w / 2);
+    draw_str_clipped(wx_u + w / 2 + 10, foot_y, "HANIEL compositor  PL-61", 0x222240, wx_u + w - 4);
+}
+
 pub fn render_onyxia_browser(
     wx: i32, wy: i32, w: u32, h: u32,
     url_buf: &[u8], url_len: usize,
     url_focused: bool,
     loaded: bool,
+    doc: &HanielDoc,
 ) {
     let wx_u = wx as u32;
     let wy_u = wy as u32;
@@ -876,36 +997,8 @@ pub fn render_onyxia_browser(
     blend_rect(wx_u + 1, canvas_top, w - 2, canvas_h, SOVEREIGN_PURPLE, 8);
 
     if loaded && url_len > 0 {
-        // ── Loaded state: render sovereign page stub ──────────────────────────
-        // Page top accent bar
-        draw_hline(wx_u + 1, canvas_top, w - 2, SOVEREIGN_PURPLE);
-
-        // Address confirmation line
-        let conf_y = canvas_top + 10;
-        draw_str_clipped(wx_u + 12, conf_y, "Navigating to:", TEXT_DIM, wx_u + w - 8);
-        let url_y = conf_y + 14;
-        if let Ok(txt) = core::str::from_utf8(&url_buf[..url_len]) {
-            draw_str_16_clipped(wx_u + 12, url_y, txt, ACCENT_TEAL, wx_u + w - 8);
-        }
-        draw_hline(wx_u + 12, url_y + 17, (url_len as u32 * 9).min(w - 24), ACCENT_TEAL);
-
-        // Status badge
-        let badge2_y = url_y + 26;
-        draw_rounded_rect(wx_u + 12, badge2_y, 80, 14, 3, 0x0D2A1A);
-        draw_border(wx_u + 12, badge2_y, 80, 14, ACCENT_TEAL);
-        draw_str(wx_u + 16, badge2_y + 8, "AWP/0.1", ACCENT_TEAL);
-
-        // HANIEL placeholder text
-        let msg_y = badge2_y + 30;
-        draw_str_clipped(wx_u + 12, msg_y,
-            "HANIEL canvas: wiring in PL-61", TEXT_DIM, wx_u + w - 8);
-        draw_str_clipped(wx_u + 12, msg_y + 14,
-            "Full render: PL-62+ compositor", TEXT_DIM, wx_u + w - 8);
-
-        // Sovereignty watermark — bottom-right of page canvas
-        let wm_y = canvas_top + canvas_h - 16;
-        draw_str_clipped(wx_u + w - 130, wm_y,
-            "AIEONYX sovereign node", 0x2A2848, wx_u + w - 4);
+        // ── PL-61: HANIEL compositor renders the routed document ──────────────
+        render_haniel_canvas(wx_u, canvas_top, w, canvas_h, doc);
     } else {
         // ── Unloaded state: new tab sovereign splash ──────────────────────────
         // AIEONYX wordmark centred in canvas
