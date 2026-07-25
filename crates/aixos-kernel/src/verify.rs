@@ -198,11 +198,11 @@ fn script_uses_awp(script: &[u8]) -> bool {
 
 /// Pack a .axpkg from components — for creating test packages in-kernel.
 /// Writes into `out` buffer. Returns bytes written, or None if too small.
-pub fn pack_axpkg<'a>(
+pub fn pack_axpkg(
     name: &[u8],
     script: &[u8],
     caps: u32,
-    out: &'a mut [u8],
+    out: &mut [u8],
 ) -> Option<usize> {
     let name_len = name.len().min(64);
     let total = 4 + 1 + 4 + name_len + 4 + script.len() + HASH_TRAILER;
