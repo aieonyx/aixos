@@ -389,13 +389,16 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
 
 #[derive(Clone, Copy)]
 struct WinSlot { open: bool, kind: u8, x: i32, y: i32, w: u32, h: u32 }
+// PL-59.5: spawn positions clamp to canvas safe zone
+//   x ∈ [CANVAS_X_MIN(200), ~880]  y ∈ [CANVAS_Y_MIN(50), CANVAS_Y_MAX(370)]
+//   Cascade: +25 per slot so stacked windows are visible
 static mut WINS: [WinSlot; 6] = [
-    WinSlot { open: false, kind: 0, x: 60,  y: 80,  w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 100, y: 100, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 140, y: 120, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 180, y: 140, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 220, y: 160, w: 580, h: 300 },
-    WinSlot { open: false, kind: 0, x: 260, y: 180, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 210, y: 60,  w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 235, y: 85,  w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 260, y: 110, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 285, y: 135, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 310, y: 160, w: 580, h: 300 },
+    WinSlot { open: false, kind: 0, x: 335, y: 185, w: 580, h: 300 },
 ];
 static mut ACTIVE_WIN: usize = 0;
 static mut DRAG_WIN: usize = 0;
@@ -1239,12 +1242,13 @@ fn shell_loop(
                         render_all_windows();
                     }
                     if !mouse_state.left { RESIZE_ACTIVE = false; DRAG_ACTIVE = false; }
-                    const DRAG_MIN_X: i32 = 0; const DRAG_MAX_X: i32 = 700;
+                    // PL-59.5: drag clamped to canvas safe zone (no overlap with panels/dock)
                     if !RESIZE_ACTIVE && DRAG_ACTIVE && mouse_state.left {
                         let dw = DRAG_WIN;
                         let w = wins()[dw];
-                        let nx = (mouse_state.x - DRAG_OFF_X).clamp(DRAG_MIN_X, DRAG_MAX_X);
-                        let ny = (mouse_state.y - DRAG_OFF_Y).clamp(50, 580);
+                        let raw_nx = mouse_state.x - DRAG_OFF_X;
+                        let raw_ny = mouse_state.y - DRAG_OFF_Y;
+                        let (nx, ny) = aixos_gpu::desktop::clamp_spawn_pos(raw_nx, raw_ny);
                         if nx != w.x || ny != w.y {
                             // Erase old position before moving
                             aixos_gpu::desktop::set_window_pos(w.x, w.y);

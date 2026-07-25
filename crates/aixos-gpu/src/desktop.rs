@@ -324,8 +324,8 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
     draw_rounded_rect(dock_x, dock_py, dock_w, 36, 10, 0x100E20);
     draw_rounded_border(dock_x, dock_py, dock_w, 36, 10, 0x2A2848);
     draw_hline(dock_x + 10, dock_py + 1, dock_w - 20, 0x3A3858);
-    // 7 app icons, 34x26 each, 6px gap, start at dock_x+10
-    let labels: [&str; 7] = ["O", "W", ">_", "F", "D", "I", "S"];
+    // PL-59.5: 7 app icons with 16×16 pixel sprites
+    // Icons: 0=Onyxia 1=Browser 2=Shell 3=Files 4=EDB 5=IAM 6=Settings
     let colors: [u32; 7] = [
         SOVEREIGN_PURPLE, 0x1850A0, ACCENT_AMBER,
         0x2A6A3A, BROWSE_GREEN, 0x8B4FDB, SETTINGS_BLUE,
@@ -336,11 +336,120 @@ pub fn render_taskbar(slots: &[(bool, u8)], active: usize) {
     while di < 7 {
         let ix = dock_x + 10 + di * (icon_w + icon_gap);
         let iy = dock_py + 5;
+        // Button background
         draw_rounded_rect(ix, iy, icon_w, 26, 4, colors[di as usize]);
-        blend_rect(ix, iy, icon_w, 26, 0x000000, 120);
-        blend_rect(ix, iy, icon_w, 13, 0xFFFFFF, 20);
+        blend_rect(ix, iy, icon_w, 26, 0x000000, 110);
+        blend_rect(ix, iy, icon_w, 13, 0xFFFFFF, 22);
         draw_rounded_border(ix, iy, icon_w, 26, 4, 0x33334A);
-        draw_str(ix + 9, iy + 17, labels[di as usize], TEXT_WHITE);
+        // Sprite origin: center 16x16 in the 30x26 button → offset (7, 5)
+        let sx = ix + 7;
+        let sy = iy + 5;
+        match di {
+            0 => {
+                // Onyxia: sovereign diamond — 4 triangles forming ◇
+                // Top triangle  (rows 0-4): 1→9 wide
+                draw_hline(sx + 7, sy,     2, TEXT_WHITE);
+                draw_hline(sx + 5, sy + 1, 6, TEXT_WHITE);
+                draw_hline(sx + 3, sy + 2, 10, TEXT_WHITE);
+                draw_hline(sx + 1, sy + 3, 14, TEXT_WHITE);
+                // Middle row
+                draw_hline(sx,     sy + 4, 16, 0xCCBBFF);
+                // Bottom triangle (rows 5-9)
+                draw_hline(sx + 1, sy + 5, 14, TEXT_WHITE);
+                draw_hline(sx + 3, sy + 6, 10, TEXT_WHITE);
+                draw_hline(sx + 5, sy + 7, 6,  TEXT_WHITE);
+                draw_hline(sx + 7, sy + 8, 2,  TEXT_WHITE);
+                // Inner glow
+                draw_hline(sx + 6, sy + 3, 4, 0xFFFFFF);
+                draw_hline(sx + 5, sy + 4, 6, 0xDDCCFF);
+            }
+            1 => {
+                // Browser: globe — circle outline + meridians
+                draw_hline(sx + 4, sy,     8, 0x99BBFF);
+                draw_hline(sx + 2, sy + 1, 12, 0x99BBFF);
+                draw_hline(sx + 1, sy + 2, 14, 0x99BBFF);
+                draw_hline(sx,     sy + 3, 16, 0x99BBFF);
+                draw_hline(sx,     sy + 4, 16, 0x99BBFF);
+                draw_hline(sx,     sy + 5, 16, 0x99BBFF);
+                draw_hline(sx + 1, sy + 6, 14, 0x99BBFF);
+                draw_hline(sx + 2, sy + 7, 12, 0x99BBFF);
+                draw_hline(sx + 4, sy + 8, 8,  0x99BBFF);
+                // Meridian cross: vertical + horizontal lines in darker blue
+                draw_vline(sx + 7, sy,     9, 0x3366CC);
+                draw_vline(sx + 8, sy,     9, 0x3366CC);
+                draw_hline(sx,     sy + 4, 16, 0x3366CC);
+            }
+            2 => {
+                // Shell: >_ prompt icon
+                // > chevron (left half)
+                draw_hline(sx,     sy + 1, 4, TEXT_WHITE);
+                draw_hline(sx + 1, sy + 2, 4, TEXT_WHITE);
+                draw_hline(sx + 2, sy + 3, 4, TEXT_WHITE);
+                draw_hline(sx + 2, sy + 4, 4, TEXT_WHITE);
+                draw_hline(sx + 1, sy + 5, 4, TEXT_WHITE);
+                draw_hline(sx,     sy + 6, 4, TEXT_WHITE);
+                // _ underline (right half, bottom)
+                draw_hline(sx + 9, sy + 7, 7, ACCENT_TEAL);
+                draw_hline(sx + 9, sy + 8, 7, ACCENT_TEAL);
+                // Cursor blink block
+                draw_rect(sx + 9, sy + 4, 3, 3, ACCENT_TEAL);
+            }
+            3 => {
+                // Files / AXFS: folder icon
+                // Tab (top-left of folder)
+                draw_rect(sx, sy, 6, 2, ACCENT_AMBER);
+                // Folder body
+                draw_rect(sx, sy + 2, 16, 7, ACCENT_AMBER);
+                blend_rect(sx, sy + 2, 16, 7, 0x000000, 80);
+                // Folder body border
+                draw_border(sx, sy + 2, 16, 7, 0xFFCC44);
+                // Lines inside (files)
+                draw_hline(sx + 2, sy + 4, 11, TEXT_WHITE);
+                draw_hline(sx + 2, sy + 6, 8,  TEXT_WHITE);
+            }
+            4 => {
+                // EDB Browser: database cylinder stack
+                // Top ellipse
+                draw_hline(sx + 3, sy,     10, BROWSE_GREEN);
+                draw_hline(sx + 1, sy + 1, 14, BROWSE_GREEN);
+                draw_hline(sx + 1, sy + 2, 14, BROWSE_GREEN);
+                draw_hline(sx + 3, sy + 3, 10, BROWSE_GREEN);
+                // Cylinder body sides (3 rows each for 2 tiers)
+                draw_vline(sx + 1,  sy + 2, 7, BROWSE_GREEN);
+                draw_vline(sx + 14, sy + 2, 7, BROWSE_GREEN);
+                // Mid-tier ellipse separator
+                draw_hline(sx + 3, sy + 4, 10, ACCENT_TEAL);
+                draw_hline(sx + 1, sy + 5, 14, ACCENT_TEAL);
+                // Bottom ellipse
+                draw_hline(sx + 3, sy + 8, 10, BROWSE_GREEN);
+                draw_hline(sx + 1, sy + 7, 14, BROWSE_GREEN);
+            }
+            5 => {
+                // IAM: person silhouette
+                // Head
+                draw_rect(sx + 5, sy,     6, 5, 0xCCBBFF);
+                // Shoulders / body
+                draw_hline(sx + 2, sy + 6, 12, 0xCCBBFF);
+                draw_hline(sx + 1, sy + 7, 14, 0xCCBBFF);
+                draw_rect(sx + 2, sy + 7, 12, 2, 0xCCBBFF);
+                // ID badge dot
+                draw_rect(sx + 6, sy + 2, 4, 3, 0x7B4FDB);
+                draw_hline(sx + 7, sy + 2, 2, TEXT_WHITE);
+            }
+            _ => {
+                // Settings (6): gear — cross body + 4 notch bumps
+                // Central cross
+                draw_rect(sx + 5, sy + 2, 6, 12, SETTINGS_BLUE);
+                draw_rect(sx + 2, sy + 5, 12, 6, SETTINGS_BLUE);
+                // Corner notches (gear teeth)
+                draw_rect(sx + 1, sy + 4, 2, 2, SETTINGS_BLUE);
+                draw_rect(sx + 13, sy + 4, 2, 2, SETTINGS_BLUE);
+                draw_rect(sx + 1, sy + 10, 2, 2, SETTINGS_BLUE);
+                draw_rect(sx + 13, sy + 10, 2, 2, SETTINGS_BLUE);
+                // Centre hole
+                draw_rect(sx + 6, sy + 6, 4, 4, 0x0D0D22);
+            }
+        }
         di += 1;
     }
     // Separator
@@ -396,6 +505,12 @@ pub fn render_command_result(msg: &str) {
 const TEXT_DIM_2: u32 = 0x666688;
 
 // ── PL-20: Sovereign Window Primitive ────────────────────────────────────────
+// PL-59.5: Canvas safe-zone — windows must not overlap left panel (ends ~196)
+//           or dock (starts 676) or top bar (ends 38) or right panel (starts 1092)
+pub const CANVAS_X_MIN: i32 = 200;   // clear of left panel right edge (180+8+12)
+pub const CANVAS_Y_MIN: i32 = 50;    // clear of top bar (38)
+pub const CANVAS_X_MAX: i32 = 880;   // right panel starts at 1092; 880+580+8 < 1084 if narrow
+pub const CANVAS_Y_MAX: i32 = 370;   // y+300 ≤ 670 keeps window bottom above dock (676)
 const WIN_X: u32 = 340;
 const WIN_Y: u32 = 110;
 const WIN_W: u32 = 580;
@@ -417,6 +532,14 @@ pub fn set_window_pos(x: i32, y: i32) {
 }
 pub fn get_window_pos() -> (i32, i32) {
     unsafe { (CUR_WIN_X, CUR_WIN_Y) }
+}
+
+/// PL-59.5: Clamp a window spawn position to the canvas safe zone.
+/// Returns (clamped_x, clamped_y) — always inside left panel right edge and above dock.
+pub fn clamp_spawn_pos(x: i32, y: i32) -> (i32, i32) {
+    let cx = if x < CANVAS_X_MIN { CANVAS_X_MIN } else if x > CANVAS_X_MAX { CANVAS_X_MAX } else { x };
+    let cy = if y < CANVAS_Y_MIN { CANVAS_Y_MIN } else if y > CANVAS_Y_MAX { CANVAS_Y_MAX } else { y };
+    (cx, cy)
 }
 
 pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
