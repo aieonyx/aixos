@@ -9,10 +9,13 @@ license.workspace = true
 name = "aixos_shell"
 path = "src/lib.rs"
 
+[features]
+# std feature propagates to axon_interp for host test builds
+std = ["axon_interp/std"]
+
 [dependencies]
 aixos-kernel = { path = "../aixos-kernel" }
 aixos-haniel = { path = "../aixos-haniel" }
 # PL-62: vendored axon_interp (P71.5, upstream HEAD c7327f4)
-# Vendored into crates/axon_interp — single source of truth.
-# MAX_LINES=64, MAX_VARS=16, OUTPUT_BUF=2048, binary ops, exec_with_state()
+# no_std by default (bare-metal aarch64); std feature enables host test builds
 axon_interp = { path = "../axon_interp", default-features = false }

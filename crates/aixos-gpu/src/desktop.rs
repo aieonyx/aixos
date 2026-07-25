@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
+#![allow(dead_code)]
 
 use crate::draw::{draw_rect, draw_border, draw_hline, draw_vline, blend_rect, draw_rounded_rect, draw_rounded_border};
 use crate::framebuffer::cache_flush;

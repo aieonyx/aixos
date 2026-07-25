@@ -41,7 +41,8 @@ jobs:
         run: |
           cargo test --target x86_64-unknown-linux-gnu --lib \
             -p aixos-kernel -p aixos-identity \
-            -p aixos-shell -p aixos-net -p aixos-init \
+            -p aixos-shell --features aixos-shell/std \
+            -p aixos-net -p aixos-init \
             -p aixos-input -p aixos-gpu
 
       - name: Clippy (no-deps, aixos crates only)
