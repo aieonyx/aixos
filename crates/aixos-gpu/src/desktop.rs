@@ -261,114 +261,19 @@ pub fn render_desktop(state: &DesktopState) {
     draw_rounded_border(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
     draw_hline(rx + 1, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
     draw_str_16(rx + 12, TOP_BAR_H + 24, "SYSTEM", 0x44446A);
-    // PL-65: 6 refined right-panel icons — 3x2 grid, 36x36 each
-    // Row 0: Globe (Onyxia), Folder (Files), Terminal (Shell)
-    // Row 1: Disk (Storage), Gear (Settings), Antenna (Network)
-    let icon_colors: [u32; 6] = [
-        0x1850A0,      // Globe — blue
-        ACCENT_AMBER,  // Folder — amber
-        0x1A6A1A,      // Terminal — green
-        0x4A4A6A,      // Disk — slate
-        SETTINGS_BLUE, // Gear — blue
-        ACCENT_TEAL,   // Antenna — teal
-    ];
+    // PL-65A: 6 bitmap icons in right panel — 3x2 grid
+    // Row 0: Globe(1), Folder(3), Terminal(2)
+    // Row 1: Disk(4), Gear(5), Antenna(6)
+    let rp_icons: [u8; 6] = [1, 3, 2, 4, 5, 6];
     let mut ii = 0u32;
     while ii < 6 {
         let col = ii % 3;
         let row = ii / 3;
-        let ix = rx + 16 + col * 44;
-        let iy = TOP_BAR_H + 42 + row * 44;
-        // Button background
-        draw_rounded_rect(ix, iy, 36, 36, 6, icon_colors[ii as usize]);
-        blend_rect(ix, iy, 36, 36, 0x000000, 150);
-        blend_rect(ix, iy, 36, 18, 0xFFFFFF, 18);
-        draw_rounded_border(ix, iy, 36, 36, 6, 0x33334A);
-        // Sprite origin: 10x10 centred in 36x36 → offset (13,13)
-        let sx = ix + 8;
-        let sy = iy + 8;
-        match ii {
-            0 => {
-                // Globe (Onyxia browser)
-                draw_hline(sx + 3, sy,     14, 0x99BBFF);
-                draw_hline(sx + 1, sy + 2, 18, 0x99BBFF);
-                draw_hline(sx,     sy + 4, 20, 0x99BBFF);
-                draw_hline(sx,     sy + 7, 20, 0x99BBFF);
-                draw_hline(sx,     sy + 10, 20, 0x99BBFF);
-                draw_hline(sx + 1, sy + 13, 18, 0x99BBFF);
-                draw_hline(sx + 3, sy + 15, 14, 0x99BBFF);
-                // Meridians
-                draw_vline(sx + 9,  sy, 16, 0x3366CC);
-                draw_vline(sx + 10, sy, 16, 0x3366CC);
-                draw_hline(sx,      sy + 7, 20, 0x3366CC);
-            }
-            1 => {
-                // Folder (Files)
-                draw_rect(sx, sy + 2, 8, 3, ACCENT_AMBER);   // tab
-                draw_rect(sx, sy + 4, 20, 12, ACCENT_AMBER); // body
-                blend_rect(sx, sy + 4, 20, 12, 0x000000, 80);
-                draw_border(sx, sy + 4, 20, 12, 0xFFCC44);
-                draw_hline(sx + 2, sy + 7,  14, TEXT_WHITE);
-                draw_hline(sx + 2, sy + 10, 10, TEXT_WHITE);
-            }
-            2 => {
-                // Terminal `>_`
-                // > chevron
-                draw_hline(sx,     sy + 2, 5, TEXT_WHITE);
-                draw_hline(sx + 1, sy + 4, 5, TEXT_WHITE);
-                draw_hline(sx + 2, sy + 6, 5, TEXT_WHITE);
-                draw_hline(sx + 1, sy + 8, 5, TEXT_WHITE);
-                draw_hline(sx,     sy + 10, 5, TEXT_WHITE);
-                // _ underline
-                draw_hline(sx + 10, sy + 13, 9, ACCENT_TEAL);
-                draw_rect(sx + 10, sy + 9, 4, 3, ACCENT_TEAL);
-            }
-            3 => {
-                // Disk / Storage
-                // Top ellipse
-                draw_hline(sx + 4, sy,     12, 0xAAAACC);
-                draw_hline(sx + 2, sy + 1, 16, 0xAAAACC);
-                draw_hline(sx + 2, sy + 3, 16, 0xAAAACC);
-                draw_hline(sx + 4, sy + 4, 12, 0xAAAACC);
-                // Cylinder sides
-                draw_vline(sx + 2,  sy + 2, 10, 0xAAAACC);
-                draw_vline(sx + 17, sy + 2, 10, 0xAAAACC);
-                // Bottom ellipse
-                draw_hline(sx + 4, sy + 12, 12, 0xAAAACC);
-                draw_hline(sx + 2, sy + 13, 16, 0xAAAACC);
-                draw_hline(sx + 4, sy + 14, 12, 0xAAAACC);
-                // Label slot
-                draw_rect(sx + 5, sy + 6, 8, 3, 0x222240);
-                draw_hline(sx + 6, sy + 7, 5, ACCENT_TEAL);
-            }
-            4 => {
-                // Gear (Settings)
-                draw_rect(sx + 6, sy + 2,  8, 16, SETTINGS_BLUE);
-                draw_rect(sx + 2, sy + 6, 16,  8, SETTINGS_BLUE);
-                // Teeth
-                draw_rect(sx,     sy + 5,  3,  3, SETTINGS_BLUE);
-                draw_rect(sx + 17,sy + 5,  3,  3, SETTINGS_BLUE);
-                draw_rect(sx,     sy + 12, 3,  3, SETTINGS_BLUE);
-                draw_rect(sx + 17,sy + 12, 3,  3, SETTINGS_BLUE);
-                draw_rect(sx + 5, sy,      3,  3, SETTINGS_BLUE);
-                draw_rect(sx + 12,sy,      3,  3, SETTINGS_BLUE);
-                draw_rect(sx + 5, sy + 17, 3,  3, SETTINGS_BLUE);
-                draw_rect(sx + 12,sy + 17, 3,  3, SETTINGS_BLUE);
-                // Centre hole
-                draw_rounded_rect(sx + 7, sy + 7, 6, 6, 3, 0x0A0818);
-            }
-            _ => {
-                // Antenna / Network
-                // Mast
-                draw_vline(sx + 9,  sy + 6, 14, ACCENT_TEAL);
-                draw_vline(sx + 10, sy + 6, 14, ACCENT_TEAL);
-                // Signal arcs (3 concentric)
-                draw_hline(sx + 5, sy + 2, 10, ACCENT_TEAL);
-                draw_hline(sx + 3, sy + 4, 14, ACCENT_TEAL);
-                draw_hline(sx + 1, sy + 6, 18, ACCENT_TEAL);
-                // Base
-                draw_hline(sx + 5, sy + 18, 10, ACCENT_TEAL);
-            }
-        }
+        let ix = rx + 10 + col * 42;
+        let iy = TOP_BAR_H + 38 + row * 42;
+        // Shadow + selection highlight
+        blend_rect(ix, iy, 36, 36, 0x000000, 40);
+        crate::icons::blit_icon(rp_icons[ii as usize], ix, iy);
         ii += 1;
     }
     draw_hline(rx + 8, TOP_BAR_H + 138, PANEL_W - 16, GLASS_BORDER);
@@ -453,135 +358,20 @@ pub fn render_taskbar(slots: &[(bool, u8, bool)], active: usize) {
     draw_rounded_rect(dock_x, dock_py, dock_w, 36, 10, 0x100E20);
     draw_rounded_border(dock_x, dock_py, dock_w, 36, 10, 0x2A2848);
     draw_hline(dock_x + 10, dock_py + 1, dock_w - 20, 0x3A3858);
-    // PL-59.5: 7 app icons with 16×16 pixel sprites
-    // Icons: 0=Onyxia 1=Browser 2=Shell 3=Files 4=EDB 5=IAM 6=Settings
-    let colors: [u32; 7] = [
-        SOVEREIGN_PURPLE, 0x1850A0, ACCENT_AMBER,
-        0x2A6A3A, BROWSE_GREEN, 0x8B4FDB, SETTINGS_BLUE,
-    ];
-    let icon_w: u32 = 30;
-    let icon_gap: u32 = 6;
+    // PL-65A: 7 bitmap icons — 32x32 ARGB blits into dock buttons
+    // Dock order: 0=aieonyx 1=globe 2=terminal 3=folder 4=disk 5=gear 6=antenna
+    let icon_w: u32 = 36; // slightly larger for bitmap icons
+    let icon_gap: u32 = 4;
     let mut di = 0u32;
     while di < 7 {
-        let ix = dock_x + 10 + di * (icon_w + icon_gap);
-        let iy = dock_py + 5;
-        // Button background
-        draw_rounded_rect(ix, iy, icon_w, 26, 4, colors[di as usize]);
-        blend_rect(ix, iy, icon_w, 26, 0x000000, 110);
-        blend_rect(ix, iy, icon_w, 13, 0xFFFFFF, 22);
-        draw_rounded_border(ix, iy, icon_w, 26, 4, 0x33334A);
-        // Sprite origin: center 16x16 in the 30x26 button → offset (7, 5)
-        let sx = ix + 7;
-        let sy = iy + 5;
-        match di {
-            0 => {
-                // Onyxia: sovereign diamond — 4 triangles forming ◇
-                // Top triangle  (rows 0-4): 1→9 wide
-                draw_hline(sx + 7, sy,     2, TEXT_WHITE);
-                draw_hline(sx + 5, sy + 1, 6, TEXT_WHITE);
-                draw_hline(sx + 3, sy + 2, 10, TEXT_WHITE);
-                draw_hline(sx + 1, sy + 3, 14, TEXT_WHITE);
-                // Middle row
-                draw_hline(sx,     sy + 4, 16, 0xCCBBFF);
-                // Bottom triangle (rows 5-9)
-                draw_hline(sx + 1, sy + 5, 14, TEXT_WHITE);
-                draw_hline(sx + 3, sy + 6, 10, TEXT_WHITE);
-                draw_hline(sx + 5, sy + 7, 6,  TEXT_WHITE);
-                draw_hline(sx + 7, sy + 8, 2,  TEXT_WHITE);
-                // Inner glow
-                draw_hline(sx + 6, sy + 3, 4, 0xFFFFFF);
-                draw_hline(sx + 5, sy + 4, 6, 0xDDCCFF);
-            }
-            1 => {
-                // Browser: globe — circle outline + meridians
-                draw_hline(sx + 4, sy,     8, 0x99BBFF);
-                draw_hline(sx + 2, sy + 1, 12, 0x99BBFF);
-                draw_hline(sx + 1, sy + 2, 14, 0x99BBFF);
-                draw_hline(sx,     sy + 3, 16, 0x99BBFF);
-                draw_hline(sx,     sy + 4, 16, 0x99BBFF);
-                draw_hline(sx,     sy + 5, 16, 0x99BBFF);
-                draw_hline(sx + 1, sy + 6, 14, 0x99BBFF);
-                draw_hline(sx + 2, sy + 7, 12, 0x99BBFF);
-                draw_hline(sx + 4, sy + 8, 8,  0x99BBFF);
-                // Meridian cross: vertical + horizontal lines in darker blue
-                draw_vline(sx + 7, sy,     9, 0x3366CC);
-                draw_vline(sx + 8, sy,     9, 0x3366CC);
-                draw_hline(sx,     sy + 4, 16, 0x3366CC);
-            }
-            2 => {
-                // Shell: >_ prompt icon
-                // > chevron (left half)
-                draw_hline(sx,     sy + 1, 4, TEXT_WHITE);
-                draw_hline(sx + 1, sy + 2, 4, TEXT_WHITE);
-                draw_hline(sx + 2, sy + 3, 4, TEXT_WHITE);
-                draw_hline(sx + 2, sy + 4, 4, TEXT_WHITE);
-                draw_hline(sx + 1, sy + 5, 4, TEXT_WHITE);
-                draw_hline(sx,     sy + 6, 4, TEXT_WHITE);
-                // _ underline (right half, bottom)
-                draw_hline(sx + 9, sy + 7, 7, ACCENT_TEAL);
-                draw_hline(sx + 9, sy + 8, 7, ACCENT_TEAL);
-                // Cursor blink block
-                draw_rect(sx + 9, sy + 4, 3, 3, ACCENT_TEAL);
-            }
-            3 => {
-                // Files / AXFS: folder icon
-                // Tab (top-left of folder)
-                draw_rect(sx, sy, 6, 2, ACCENT_AMBER);
-                // Folder body
-                draw_rect(sx, sy + 2, 16, 7, ACCENT_AMBER);
-                blend_rect(sx, sy + 2, 16, 7, 0x000000, 80);
-                // Folder body border
-                draw_border(sx, sy + 2, 16, 7, 0xFFCC44);
-                // Lines inside (files)
-                draw_hline(sx + 2, sy + 4, 11, TEXT_WHITE);
-                draw_hline(sx + 2, sy + 6, 8,  TEXT_WHITE);
-            }
-            4 => {
-                // EDB Browser: database cylinder stack
-                // Top ellipse
-                draw_hline(sx + 3, sy,     10, BROWSE_GREEN);
-                draw_hline(sx + 1, sy + 1, 14, BROWSE_GREEN);
-                draw_hline(sx + 1, sy + 2, 14, BROWSE_GREEN);
-                draw_hline(sx + 3, sy + 3, 10, BROWSE_GREEN);
-                // Cylinder body sides (3 rows each for 2 tiers)
-                draw_vline(sx + 1,  sy + 2, 7, BROWSE_GREEN);
-                draw_vline(sx + 14, sy + 2, 7, BROWSE_GREEN);
-                // Mid-tier ellipse separator
-                draw_hline(sx + 3, sy + 4, 10, ACCENT_TEAL);
-                draw_hline(sx + 1, sy + 5, 14, ACCENT_TEAL);
-                // Bottom ellipse
-                draw_hline(sx + 3, sy + 8, 10, BROWSE_GREEN);
-                draw_hline(sx + 1, sy + 7, 14, BROWSE_GREEN);
-            }
-            5 => {
-                // IAM: person silhouette
-                // Head
-                draw_rect(sx + 5, sy,     6, 5, 0xCCBBFF);
-                // Shoulders / body
-                draw_hline(sx + 2, sy + 6, 12, 0xCCBBFF);
-                draw_hline(sx + 1, sy + 7, 14, 0xCCBBFF);
-                draw_rect(sx + 2, sy + 7, 12, 2, 0xCCBBFF);
-                // ID badge dot
-                draw_rect(sx + 6, sy + 2, 4, 3, 0x7B4FDB);
-                draw_hline(sx + 7, sy + 2, 2, TEXT_WHITE);
-            }
-            _ => {
-                // Settings (6): gear — cross body + 4 notch bumps
-                // Central cross
-                draw_rect(sx + 5, sy + 2, 6, 12, SETTINGS_BLUE);
-                draw_rect(sx + 2, sy + 5, 12, 6, SETTINGS_BLUE);
-                // Corner notches (gear teeth)
-                draw_rect(sx + 1, sy + 4, 2, 2, SETTINGS_BLUE);
-                draw_rect(sx + 13, sy + 4, 2, 2, SETTINGS_BLUE);
-                draw_rect(sx + 1, sy + 10, 2, 2, SETTINGS_BLUE);
-                draw_rect(sx + 13, sy + 10, 2, 2, SETTINGS_BLUE);
-                // Centre hole
-                draw_rect(sx + 6, sy + 6, 4, 4, 0x0D0D22);
-            }
-        }
+        let ix = dock_x + 6 + di * (icon_w + icon_gap);
+        let iy = dock_py + 2;
+        // Blit 32x32 icon centred in 36x36 slot
+        crate::icons::blit_icon(di as u8, ix + 2, iy + 2);
         di += 1;
     }
     // Separator
+    // PL-65: no axos> prompt — dock is icons only
     // PL-65: no axos> prompt — dock is icons only
     // Open window indicators — teal dot = open, amber dot = minimized
     let mut wi = 0usize;
@@ -600,7 +390,7 @@ pub fn render_taskbar(slots: &[(bool, u8, bool)], active: usize) {
                 9 => 3, // File Browser -> F (folder icon)
                 _ => 0,
             };
-            let dot_x = dock_x + 10 + dock_idx * (icon_w + icon_gap) + icon_w / 2 - 3;
+            let dot_x = dock_x + 6 + dock_idx * (36 + 4) + 18 - 3;
             let dot_col = if minimized { ACCENT_AMBER } else { ACCENT_TEAL };
             draw_rect(dot_x, dock_py + 2, 6, 2, dot_col);
         }
@@ -676,8 +466,8 @@ pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
     let dy = DOCK_Y as i32;
     if y < dy || y > dy + 44 { return None; }
     let dock_x: i32 = (1280 - 314) / 2; // matches new dock_w=314
-    let icon_w: i32 = 30;
-    let icon_gap: i32 = 6;
+    let icon_w: i32 = 36; // PL-65A bitmap icons
+    let icon_gap: i32 = 4;
     let mut i = 0u8;
     while i < 7 {
         let ix = dock_x + 10 + (i as i32) * (icon_w + icon_gap);
