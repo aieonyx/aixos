@@ -1019,14 +1019,13 @@ pub fn render_proc_window(
     // ── Column header row ─────────────────────────────────────────────────────
     let hdr_y = (wy + WIN_TITLE_H as i32 + 4) as u32;
     draw_rect(wx_u + 1, hdr_y, w - 2, 14, 0x0A0A1A);
-    draw_str(wx_u + 6,  hdr_y + 4, "PID", TEXT_DIM);
-    draw_str(wx_u + 28, hdr_y + 4, "NAME            ", TEXT_DIM);
-    draw_str(wx_u + 148, hdr_y + 4, "ST", TEXT_DIM);
-    draw_str(wx_u + 168, hdr_y + 4, "PRI", TEXT_DIM);
-    draw_str(wx_u + 196, hdr_y + 4, "TICKS", TEXT_DIM);
-    draw_str(wx_u + 252, hdr_y + 4, "YIELDS", TEXT_DIM);
-
-    // Tick total in header right
+    // PL-65 fix: wider columns — PID(3ch), NAME(16ch=128px), ST, PRI, TICKS, YIELDS
+    draw_str(wx_u + 8,   hdr_y + 4, "PID",    TEXT_DIM);
+    draw_str(wx_u + 36,  hdr_y + 4, "NAME",   TEXT_DIM);
+    draw_str(wx_u + 188, hdr_y + 4, "ST",     TEXT_DIM);
+    draw_str(wx_u + 210, hdr_y + 4, "PRI",    TEXT_DIM);
+    draw_str(wx_u + 248, hdr_y + 4, "TICKS",  TEXT_DIM);
+    draw_str(wx_u + 346, hdr_y + 4, "YIELDS", TEXT_DIM);
     draw_str(wx_u + w - 120, hdr_y + 4, "tick:", TEXT_DIM);
     draw_hex32(wx_u + w - 84, hdr_y + 4, tick_total as u32, ACCENT_TEAL);
 
@@ -1056,13 +1055,14 @@ pub fn render_proc_window(
             draw_rect(wx_u + 2, ry, w - 4, row_h - 1, 0x0A1A12);
         }
 
-        // PID
+        // PID — display as 2-char decimal (0..99)
         let pid_col = if is_running { ACCENT_TEAL } else { TEXT_DIM };
-        draw_hex32(wx_u + 6, ry + 4, s.pid as u32, pid_col);
+        let pid_d = [b'0' + (s.pid / 10), b'0' + (s.pid % 10)];
+        if let Ok(ps) = core::str::from_utf8(&pid_d) { draw_str(wx_u + 8, ry + 4, ps, pid_col); }
 
-        // Name (clipped to column width)
+        // Name (clipped to ST column)
         let name_col = if is_running { TEXT_WHITE } else { 0x9999BB };
-        draw_str_clipped(wx_u + 28, ry + 4, s.name_str(), name_col, wx_u + 148);
+        draw_str_clipped(wx_u + 36, ry + 4, s.name_str(), name_col, wx_u + 184);
 
         // State char
         let st_col = match s.state_ch {
@@ -1079,16 +1079,17 @@ pub fn render_proc_window(
             b'D' => "D",
             _    => "?",
         };
-        draw_str(wx_u + 148, ry + 4, st_str, st_col);
+        draw_str(wx_u + 188, ry + 4, st_str, st_col);
 
-        // Priority
-        draw_hex32(wx_u + 168, ry + 4, s.priority as u32, TEXT_DIM);
+        // Priority as decimal
+        let pri_d = [b'0' + (s.priority / 100), b'0' + ((s.priority/10)%10), b'0' + (s.priority%10)];
+        if let Ok(ps) = core::str::from_utf8(&pri_d) { draw_str(wx_u + 210, ry + 4, ps, TEXT_DIM); }
 
-        // Ticks (low 32 bits)
-        draw_hex32(wx_u + 196, ry + 4, s.ticks as u32, TEXT_DIM);
+        // Ticks as hex (low 32 bits)
+        draw_hex32(wx_u + 248, ry + 4, s.ticks as u32, TEXT_DIM);
 
-        // Yields
-        draw_hex32(wx_u + 252, ry + 4, s.yields, TEXT_DIM);
+        // Yields as hex
+        draw_hex32(wx_u + 346, ry + 4, s.yields, TEXT_DIM);
 
         row += 1;
     }
