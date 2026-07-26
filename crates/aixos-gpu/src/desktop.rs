@@ -1151,7 +1151,7 @@ pub fn render_file_browser(
     // ── Left sidebar ──────────────────────────────────────────────────────────
     draw_rect(wx_u, content_y, sidebar_w, content_h, 0x07070F);
     draw_vline(wx_u + sidebar_w, content_y, content_h, PANEL_BORDER);
-    draw_str(wx_u + 8, content_y + 8, "SOVEREIGN FILES", 0x33334A);
+    draw_str(wx_u + 8, content_y + 6, "FILES", 0x33334A);
 
     let nav_items: [(&str, u32); 8] = [
         ("Home",         0x888899),
@@ -1165,7 +1165,7 @@ pub fn render_file_browser(
     ];
     let mut ni = 0u32;
     while ni < 8 {
-        let ny = content_y + 24 + ni * 22;
+        let ny = content_y + 20 + ni * 22;
         let (label, col) = nav_items[ni as usize];
         if ni == 1 {
             draw_rect(wx_u + 4, ny - 2, sidebar_w - 8, 18, 0x1A1A38);
@@ -1188,8 +1188,8 @@ pub fn render_file_browser(
     }
     draw_rect(wx_u + 8, stor_y + 12, sidebar_w - 16, 4, 0x22224A);
     draw_rect(wx_u + 8, stor_y + 12, (sidebar_w - 16) * used_pct.min(100) / 100, 4, SOVEREIGN_PURPLE);
-    draw_str(wx_u + 8, stor_y + 20, "AXFS local-first", 0x2A2A44);
-    draw_str(wx_u + 8, stor_y + 32, "Sovereign Protected", 0x1A4A2A);
+    draw_str(wx_u + 8, stor_y + 20, "AXFS local", 0x2A2A44);
+    draw_str(wx_u + 8, stor_y + 32, "Protected", 0x1A4A2A);
 
     // ── Main file list ────────────────────────────────────────────────────────
     draw_rect(main_x, content_y, main_w, content_h, WIN_BG);
@@ -1210,9 +1210,9 @@ pub fn render_file_browser(
     // Column headers
     let hdr_y = nav_y + 26;
     draw_rect(main_x, hdr_y, main_w, 14, 0x0A0A1A);
-    draw_str(main_x + 36,             hdr_y + 3, "Name",     TEXT_DIM);
-    draw_str(main_x + main_w - 86,    hdr_y + 3, "Modified", TEXT_DIM);
-    draw_str(main_x + main_w - 26,    hdr_y + 3, "Size",     TEXT_DIM);
+    draw_str(main_x + 36,          hdr_y + 3, "Name",  TEXT_DIM);
+    draw_str(main_x + main_w - 56, hdr_y + 3, "Type",  TEXT_DIM);
+    draw_str(main_x + main_w - 28, hdr_y + 3, "Size",  TEXT_DIM);
     draw_hline(main_x, hdr_y + 14, main_w, PANEL_BORDER);
 
     // File rows
@@ -1252,8 +1252,8 @@ pub fn render_file_browser(
         let nc = if is_sel { TEXT_WHITE } else { 0xCCCCEE };
         draw_str_clipped(main_x + 26, ry + 7, e.name_str(), nc, main_x + main_w - 100);
 
-        // Type
-        draw_str(main_x + main_w - 88, ry + 7, type_label, TEXT_DIM);
+        // Type badge - right-aligned
+        draw_str(main_x + main_w - 58, ry + 7, type_label, TEXT_DIM);
 
         // Size
         if e.size >= 1024 {
@@ -1281,7 +1281,7 @@ pub fn render_file_browser(
     let c2 = b'0' + (count % 10) as u8;
     let cnt = [c1, c2];
     if let Ok(s) = core::str::from_utf8(&cnt) { draw_str(main_x + 8, foot_y + 8, s, TEXT_DIM); }
-    draw_str(main_x + 22, foot_y + 8, "items", TEXT_DIM);
+    draw_str(main_x + 24, foot_y + 8, " items", TEXT_DIM);
     // Protection badge
     draw_rounded_rect(main_x + main_w - 110, foot_y + 5, 12, 12, 3, ACCENT_TEAL);
     blend_rect(main_x + main_w - 110, foot_y + 5, 12, 12, 0x000000, 80);
@@ -1314,14 +1314,14 @@ pub fn render_file_browser(
 
         // File name + type
         draw_str_clipped(preview_x + 8, fi_y + 48, e.name_str(), TEXT_WHITE, preview_x + preview_w - 4);
-        draw_str_clipped(preview_x + 8, fi_y + 62, type_name, TEXT_DIM, preview_x + preview_w - 4);
+        draw_str_clipped(preview_x + 8, fi_y + 62, type_name, TEXT_DIM, preview_x + preview_w - 6);
 
         draw_hline(preview_x + 8, fi_y + 76, preview_w - 16, PANEL_BORDER);
 
         // Metadata
         let meta_y = fi_y + 84;
         draw_str(preview_x + 8,  meta_y,      "Type",     TEXT_DIM);
-        draw_str_clipped(preview_x + 56, meta_y, type_name, TEXT_WHITE, preview_x + preview_w - 4);
+        draw_str_clipped(preview_x + 56, meta_y, type_name, TEXT_WHITE, preview_x + preview_w - 6);
         draw_str(preview_x + 8,  meta_y + 20, "Size",     TEXT_DIM);
         if e.size >= 1024 {
             let kb = e.size / 1024;

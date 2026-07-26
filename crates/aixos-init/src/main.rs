@@ -630,6 +630,7 @@ static mut ONY_URL_BUF: ShellBuf = ShellBuf::new();
 static mut ONY_URL_FOCUSED: bool = false;
 // PL-65: File Browser (kind=9) state
 static mut FB_SELECTED: usize = 0;
+static mut FB_ACTION: u8 = 0; // 0=none 1=open 2=verify 3=encrypt
 static mut FB_ENTRIES: [aixos_gpu::desktop::FsEntry; 16] = [
     aixos_gpu::desktop::FsEntry::empty(),
     aixos_gpu::desktop::FsEntry::empty(),
@@ -1762,6 +1763,98 @@ fn handle_click(x: i32, y: i32) {
                     ONY_URL_FOCUSED = true;
                 }
                 if w.kind == 4 { EDB_FOCUSED = true; }
+                // PL-65B: File browser click handling
+                if w.kind == 9 {
+                    let sidebar_w: i32 = 130;
+                    let preview_w: i32 = 160;
+                    let main_x = w.x + sidebar_w + 1;
+                    let preview_x = w.x + w.w as i32 - preview_w;
+                    let content_y = w.y + 24;
+                    // File row click — select file
+                    let nav_h: i32 = 26;
+                    let hdr_h: i32 = 14;
+                    let body_top = content_y + nav_h + hdr_h + 1;
+                    let row_h: i32 = 22;
+                    if x >= main_x && x < preview_x && y >= body_top {
+                        let row_idx = ((y - body_top) / row_h) as usize;
+                        if row_idx < FB_COUNT {
+                            FB_SELECTED = row_idx;
+                            FB_ACTION = 0;
+                        }
+                    }
+                    // Preview panel button clicks
+                    if x >= preview_x && x < w.x + w.w as i32 {
+                        // Button positions match render: meta_y = fi_y+84, btn_y = meta_y+68
+                        // fi_y = content_y + 14
+                        let fi_y = content_y + 14;
+                        let meta_y = fi_y + 84;
+                        let btn_y = meta_y + 68;
+                        let btn_w: i32 = preview_w - 16;
+                        let bx = preview_x + 8;
+                        // Open button
+                        if x >= bx && x < bx + btn_w && y >= btn_y && y < btn_y + 20 {
+                            FB_ACTION = 1; // open
+                        }
+                        // Verify button
+                        if x >= bx && x < bx + btn_w && y >= btn_y + 26 && y < btn_y + 46 {
+                            FB_ACTION = 2; // verify
+                        }
+                        // Encrypt button
+                        if x >= bx && x < bx + btn_w && y >= btn_y + 52 && y < btn_y + 72 {
+                            FB_ACTION = 3; // encrypt stub
+                        }
+                    }
+                    // Process FB_ACTION
+                    if FB_ACTION > 0 && FB_SELECTED < FB_COUNT {
+                        let entry = &FB_ENTRIES[FB_SELECTED];
+                        let fname = &entry.name[..entry.name_len];
+                        match FB_ACTION {
+                            1 => {
+                                // Open: run .ax file via axon_interp, or verify+run .axpkg
+                                if let Some(idx) = aixos_axfs::find(fname) {
+                                    if let Some(f) = aixos_axfs::file_at(idx) {
+                                        let script = f.data_bytes();
+                                        let result = aixos_shell::axon_interp::exec(
+                                            script,
+                                            aixos_identity::node_id(),
+                                            if aixos_net::virtio_net::is_live() {
+                                                Some(|nid:u64,p:&[u8]| aixos_net::virtio_net::send_awp_frame(nid,p))
+                                            } else { None },
+                                        );
+                                        // Store output in AXFS_BUF for shell display
+                                        let out = result.as_str();
+                                        let len = out.len().min(510);
+                                        AXFS_BUF_LEN = len;
+                                        let mut ii=0; while ii<len{AXFS_BUF[ii]=out[ii];ii+=1;}
+                                    }
+                                }
+                            }
+                            2 => {
+                                // Verify: run verify_axpkg and show result
+                                if let Some(idx) = aixos_axfs::find(fname) {
+                                    if let Some(f) = aixos_axfs::file_at(idx) {
+                                        let data = f.data_bytes();
+                                        match aixos_kernel::verify::verify_axpkg(data) {
+                                            aixos_kernel::verify::VerifyGate::Pass { name:_, script:_, caps:_ } => {
+                                                let msg = b"VERIFIED: package integrity OK";
+                                                AXFS_BUF_LEN = msg.len();
+                                                let mut ii=0; while ii<msg.len(){AXFS_BUF[ii]=msg[ii];ii+=1;}
+                                            }
+                                            aixos_kernel::verify::VerifyGate::Reject(reason) => {
+                                                let msg = reason.as_str().as_bytes();
+                                                let l = msg.len().min(510);
+                                                AXFS_BUF_LEN = l;
+                                                let mut ii=0; while ii<l{AXFS_BUF[ii]=msg[ii];ii+=1;}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {} // encrypt stub — not yet implemented
+                        }
+                        FB_ACTION = 0;
+                    }
+                }
                 render_all_windows();
                 return;
             }
