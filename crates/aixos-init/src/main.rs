@@ -628,6 +628,27 @@ static mut PROC_COUNT: usize = 0;
 // PL-60: Onyxia browser state
 static mut ONY_URL_BUF: ShellBuf = ShellBuf::new();
 static mut ONY_URL_FOCUSED: bool = false;
+// PL-65: File Browser (kind=9) state
+static mut FB_SELECTED: usize = 0;
+static mut FB_ENTRIES: [aixos_gpu::desktop::FsEntry; 16] = [
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+    aixos_gpu::desktop::FsEntry::empty(),
+];
+static mut FB_COUNT: usize = 0;
 static mut ONY_LOADED: bool = false;
 // PL-61: current routed document + status page live strings
 static mut ONY_IS_STATUS: bool = false;
@@ -1048,6 +1069,24 @@ fn render_window_for_slot(i: usize) {
                 );
             }
         }
+        // PL-65: File Browser window
+        9 => {
+            unsafe {
+                populate_fb_entries();
+                // AXFS disk usage: approximate
+                let disk_used: u32 = (FB_COUNT * 256) as u32;
+                let disk_total: u32 = 65536; // 64KB sovereign AXFS
+                aixos_gpu::desktop::render_window("Files — AXFS Browser", &[], w.w, w.h);
+                aixos_gpu::desktop::render_file_browser(
+                    w.x, w.y, w.w, w.h,
+                    &FB_ENTRIES[..FB_COUNT],
+                    FB_COUNT,
+                    FB_SELECTED,
+                    disk_used,
+                    disk_total,
+                );
+            }
+        }
         _ => aixos_gpu::desktop::render_window(
             "Sovereign Node - aiXos Phoenix",
             &["aiXos Phoenix v0.1.0", "Arch: aarch64 (QEMU virt)",
@@ -1162,7 +1201,7 @@ fn handle_dock_click(x: i32, y: i32) {
             0 => 7, // Onyxia -> Onyxia Browser
             1 => 7, // Browser -> Onyxia Browser (same window)
             2 => 1, // Shell
-            3 => 6, // Files -> AXFS Files window
+            3 => 9, // Folder -> File Browser (kind 9, PL-65)
             4 => 4, // EDB Browser
             5 => 8, // I=IAM/Processes -> Process Table window (PL-62)
             6 => 3, // Settings
@@ -1233,7 +1272,7 @@ fn push_echo() -> &'static str {
         let bufs = &mut *core::ptr::addr_of_mut!(ECHO_BUFS);
         let bytes = win_buf().as_slice();
         let n = if bytes.len() > 67 { 67 } else { bytes.len() };
-        bufs[i][..5].copy_from_slice(b"win> ");
+        bufs[i][..5].copy_from_slice(b"axc> ");
         bufs[i][5..5 + n].copy_from_slice(&bytes[..n]);
         core::str::from_utf8_unchecked(&(&*core::ptr::addr_of!(ECHO_BUFS))[i][..5 + n])
     }
@@ -1472,6 +1511,31 @@ unsafe fn build_status_doc() {
     HANIEL_STATUS_DOC.links[1]  = "awp://about";
     HANIEL_STATUS_DOC.link_len  = 2;
     HANIEL_STATUS_DOC.page_kind = 2; // status tint
+}
+
+// PL-65: Populate FB_ENTRIES from AXFS for the File Browser window
+unsafe fn populate_fb_entries() {
+    FB_COUNT = 0;
+    let mut i = 0usize;
+    while i < 64 && FB_COUNT < 16 {
+        if let Some(f) = aixos_axfs::file_at(i) {
+            let name = f.name_bytes();
+            let nlen = name.len().min(32);
+            let size = f.data_bytes().len() as u32;
+            // Detect kind by extension
+            let kind: u8 = if nlen >= 7 && &name[nlen-7..nlen] == b".axpkg" { 1 }
+                else if nlen >= 3 && &name[nlen-3..nlen] == b".ax" { 0 }
+                else if nlen >= 4 && &name[nlen-4..nlen] == b".txt" { 2 }
+                else { 3 };
+            FB_ENTRIES[FB_COUNT].name = [0u8; 32];
+            FB_ENTRIES[FB_COUNT].name[..nlen].copy_from_slice(&name[..nlen]);
+            FB_ENTRIES[FB_COUNT].name_len = nlen;
+            FB_ENTRIES[FB_COUNT].size = size;
+            FB_ENTRIES[FB_COUNT].kind = kind;
+            FB_COUNT += 1;
+        }
+        i += 1;
+    }
 }
 
 // PL-60: Onyxia browser keyboard handler
@@ -1713,12 +1777,12 @@ fn handle_click(x: i32, y: i32) {
             }
             if icon_hit >= 0 {
                 let kind: i32 = match icon_hit {
-                    0 => 0, // O -> Node
-                    1 => 2, // F -> EDB Store
-                    2 => 3, // S -> Settings
-                    3 => 3, // A -> Settings placeholder
-                    4 => 4, // D -> EDB Browser
-                    5 => 5, // N -> Network
+                    0 => 7, // Globe -> Onyxia Browser
+                    1 => 9, // Folder -> File Browser (PL-65)
+                    2 => 1, // Terminal -> Shell
+                    3 => 9, // Disk -> File Browser (storage view)
+                    4 => 3, // Gear -> Settings
+                    5 => 5, // Antenna -> Network
                     _ => -1,
                 };
                 if kind >= 0 {

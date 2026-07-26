@@ -151,16 +151,19 @@ pub fn render_desktop(state: &DesktopState) {
         draw_rect(*sx, *sy, 1, 1, 0x555577);
     }
 
-    // ── PL-59.2: 64x64 sovereign logo with ambient glow ──────────────────────
+    // ── PL-65: Enhanced radial glow — soft sovereign presence ────────────────
     let logo_x: u32 = 640u32.saturating_sub(crate::logo::LOGO_W / 2);
     let logo_y: u32 = 348;
 
-    // Draw glow halos behind logo (concentric dim circles)
+    // Outer diffuse halo
     let gc = logo_x + crate::logo::LOGO_W / 2;
     let gy = logo_y + crate::logo::LOGO_H / 2;
-    blend_rect(gc.saturating_sub(48), gy.saturating_sub(48), 96, 96, 0x6B3FA0, 18);
-    blend_rect(gc.saturating_sub(36), gy.saturating_sub(36), 72, 72, 0x6B3FA0, 28);
-    blend_rect(gc.saturating_sub(24), gy.saturating_sub(24), 48, 48, 0x8840FF, 40);
+    blend_rect(gc.saturating_sub(120), gy.saturating_sub(120), 240, 240, 0x4B2F80, 6);
+    blend_rect(gc.saturating_sub(80),  gy.saturating_sub(80),  160, 160, 0x5B3A9A, 10);
+    blend_rect(gc.saturating_sub(60),  gy.saturating_sub(60),  120, 120, 0x6B3FA0, 16);
+    blend_rect(gc.saturating_sub(48), gy.saturating_sub(48), 96, 96, 0x6B3FA0, 22);
+    blend_rect(gc.saturating_sub(36), gy.saturating_sub(36), 72, 72, 0x7040C0, 32);
+    blend_rect(gc.saturating_sub(24), gy.saturating_sub(24), 48, 48, 0x8840FF, 44);
 
     // Blit the pixel logo on top
     crate::logo::blit_logo(logo_x, logo_y);
@@ -175,18 +178,49 @@ pub fn render_desktop(state: &DesktopState) {
     draw_rounded_border(8, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
     draw_hline(9, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
     draw_str_16(20, TOP_BAR_H + 24, "IDENTITY", 0x44446A);
-    draw_rect(20, TOP_BAR_H + 42, 32, 32, SOVEREIGN_PURPLE);
-    blend_rect(20, TOP_BAR_H + 42, 32, 32, 0xFFFFFF, 20);
-    // PL-49: show user name if set, else fallback to "E" + hex node_id
-    if !state.user_name.is_empty() {
-        if let Ok(s) = core::str::from_utf8(state.user_name) {
-            draw_str_16(20, TOP_BAR_H + 58, s, TEXT_WHITE);
+    // PL-65: Avatar circle — 40x40 purple circle with "E" initial
+    let av_x: u32 = 20;
+    let av_y: u32 = TOP_BAR_H + 38;
+    let av_r: u32 = 20;
+    // Draw filled circle via concentric hlines
+    let mut ay = 0u32;
+    while ay < av_r * 2 {
+        let dy = if ay < av_r { av_r - ay } else { ay - av_r };
+        let dx = {
+            let r2 = av_r * av_r;
+            let d2 = dy * dy;
+            if d2 > r2 { 0 } else {
+                let s = r2 - d2;
+                // integer sqrt
+                let mut root = s;
+                let mut iter = 0;
+                while iter < 16 { root = (root + s / (root + 1)) / 2; iter += 1; }
+                root
+            }
+        };
+        if dx > 0 {
+            draw_hline(av_x + av_r - dx, av_y + ay, dx * 2, SOVEREIGN_PURPLE);
         }
-        draw_str(20, TOP_BAR_H + 76, "Sovereign", 0x44446A);
+        ay += 1;
+    }
+    // Highlight top of circle
+    blend_rect(av_x, av_y, av_r * 2, av_r, 0xFFFFFF, 25);
+    // "E" initial — centred in circle
+    let init_x = av_x + av_r - 4;
+    let init_y = av_y + av_r - 8;
+    if !state.user_name.is_empty() {
+        // Use first letter of user name
+        if let Ok(s) = core::str::from_utf8(state.user_name) {
+            let first = &s[..s.len().min(1)];
+            draw_str_16(init_x, init_y, first, TEXT_WHITE);
+            // Name below avatar
+            draw_str_16(av_x + av_r * 2 + 8, av_y + 6, s, TEXT_WHITE);
+            draw_str(av_x + av_r * 2 + 8, av_y + 24, "Sovereign", 0x44446A);
+        }
     } else {
-        draw_str_16(20, TOP_BAR_H + 58, "E", TEXT_WHITE);
-        draw_hex32(36, TOP_BAR_H + 60, state.node_id as u32, TEXT_WHITE);
-        draw_str(20, TOP_BAR_H + 76, "Sovereign", 0x44446A);
+        draw_str_16(init_x, init_y, "E", TEXT_WHITE);
+        draw_str_16(av_x + av_r * 2 + 8, av_y + 6, "Edison", TEXT_WHITE);
+        draw_str(av_x + av_r * 2 + 8, av_y + 24, "Sovereign", 0x44446A);
     }
     draw_hline(16, TOP_BAR_H + 90, PANEL_W - 16, GLASS_BORDER);
     draw_str_16(20, TOP_BAR_H + 104, "SPACES", 0x44446A);
@@ -227,43 +261,138 @@ pub fn render_desktop(state: &DesktopState) {
     draw_rounded_border(rx, TOP_BAR_H + 8, PANEL_W, 720 - TOP_BAR_H - DOCK_H - 16, 8, GLASS_BORDER);
     draw_hline(rx + 1, TOP_BAR_H + 9, PANEL_W - 2, 0x3A3860);
     draw_str_16(rx + 12, TOP_BAR_H + 24, "SYSTEM", 0x44446A);
-    let icon_labels: [&str; 6] = ["O","F","S","A","D","N"];
-    let icon_colors: [u32; 6] = [SOVEREIGN_PURPLE,0x1850A0,SETTINGS_BLUE,0x331A4A,BROWSE_GREEN,ACCENT_TEAL]; // A dimmed=stub, N=teal(Network wired)
+    // PL-65: 6 refined right-panel icons — 3x2 grid, 36x36 each
+    // Row 0: Globe (Onyxia), Folder (Files), Terminal (Shell)
+    // Row 1: Disk (Storage), Gear (Settings), Antenna (Network)
+    let icon_colors: [u32; 6] = [
+        0x1850A0,      // Globe — blue
+        ACCENT_AMBER,  // Folder — amber
+        0x1A6A1A,      // Terminal — green
+        0x4A4A6A,      // Disk — slate
+        SETTINGS_BLUE, // Gear — blue
+        ACCENT_TEAL,   // Antenna — teal
+    ];
     let mut ii = 0u32;
     while ii < 6 {
         let col = ii % 3;
         let row = ii / 3;
         let ix = rx + 16 + col * 44;
         let iy = TOP_BAR_H + 42 + row * 44;
+        // Button background
         draw_rounded_rect(ix, iy, 36, 36, 6, icon_colors[ii as usize]);
-        blend_rect(ix, iy, 36, 36, 0x000000, 160);
-        blend_rect(ix, iy, 36, 18, 0xFFFFFF, 15);
-        draw_rounded_border(ix, iy, 36, 36, 6, 0x44446A);
-        draw_str(ix + 12, iy + 22, icon_labels[ii as usize], TEXT_WHITE);
+        blend_rect(ix, iy, 36, 36, 0x000000, 150);
+        blend_rect(ix, iy, 36, 18, 0xFFFFFF, 18);
+        draw_rounded_border(ix, iy, 36, 36, 6, 0x33334A);
+        // Sprite origin: 10x10 centred in 36x36 → offset (13,13)
+        let sx = ix + 8;
+        let sy = iy + 8;
+        match ii {
+            0 => {
+                // Globe (Onyxia browser)
+                draw_hline(sx + 3, sy,     14, 0x99BBFF);
+                draw_hline(sx + 1, sy + 2, 18, 0x99BBFF);
+                draw_hline(sx,     sy + 4, 20, 0x99BBFF);
+                draw_hline(sx,     sy + 7, 20, 0x99BBFF);
+                draw_hline(sx,     sy + 10, 20, 0x99BBFF);
+                draw_hline(sx + 1, sy + 13, 18, 0x99BBFF);
+                draw_hline(sx + 3, sy + 15, 14, 0x99BBFF);
+                // Meridians
+                draw_vline(sx + 9,  sy, 16, 0x3366CC);
+                draw_vline(sx + 10, sy, 16, 0x3366CC);
+                draw_hline(sx,      sy + 7, 20, 0x3366CC);
+            }
+            1 => {
+                // Folder (Files)
+                draw_rect(sx, sy + 2, 8, 3, ACCENT_AMBER);   // tab
+                draw_rect(sx, sy + 4, 20, 12, ACCENT_AMBER); // body
+                blend_rect(sx, sy + 4, 20, 12, 0x000000, 80);
+                draw_border(sx, sy + 4, 20, 12, 0xFFCC44);
+                draw_hline(sx + 2, sy + 7,  14, TEXT_WHITE);
+                draw_hline(sx + 2, sy + 10, 10, TEXT_WHITE);
+            }
+            2 => {
+                // Terminal `>_`
+                // > chevron
+                draw_hline(sx,     sy + 2, 5, TEXT_WHITE);
+                draw_hline(sx + 1, sy + 4, 5, TEXT_WHITE);
+                draw_hline(sx + 2, sy + 6, 5, TEXT_WHITE);
+                draw_hline(sx + 1, sy + 8, 5, TEXT_WHITE);
+                draw_hline(sx,     sy + 10, 5, TEXT_WHITE);
+                // _ underline
+                draw_hline(sx + 10, sy + 13, 9, ACCENT_TEAL);
+                draw_rect(sx + 10, sy + 9, 4, 3, ACCENT_TEAL);
+            }
+            3 => {
+                // Disk / Storage
+                // Top ellipse
+                draw_hline(sx + 4, sy,     12, 0xAAAACC);
+                draw_hline(sx + 2, sy + 1, 16, 0xAAAACC);
+                draw_hline(sx + 2, sy + 3, 16, 0xAAAACC);
+                draw_hline(sx + 4, sy + 4, 12, 0xAAAACC);
+                // Cylinder sides
+                draw_vline(sx + 2,  sy + 2, 10, 0xAAAACC);
+                draw_vline(sx + 17, sy + 2, 10, 0xAAAACC);
+                // Bottom ellipse
+                draw_hline(sx + 4, sy + 12, 12, 0xAAAACC);
+                draw_hline(sx + 2, sy + 13, 16, 0xAAAACC);
+                draw_hline(sx + 4, sy + 14, 12, 0xAAAACC);
+                // Label slot
+                draw_rect(sx + 5, sy + 6, 8, 3, 0x222240);
+                draw_hline(sx + 6, sy + 7, 5, ACCENT_TEAL);
+            }
+            4 => {
+                // Gear (Settings)
+                draw_rect(sx + 6, sy + 2,  8, 16, SETTINGS_BLUE);
+                draw_rect(sx + 2, sy + 6, 16,  8, SETTINGS_BLUE);
+                // Teeth
+                draw_rect(sx,     sy + 5,  3,  3, SETTINGS_BLUE);
+                draw_rect(sx + 17,sy + 5,  3,  3, SETTINGS_BLUE);
+                draw_rect(sx,     sy + 12, 3,  3, SETTINGS_BLUE);
+                draw_rect(sx + 17,sy + 12, 3,  3, SETTINGS_BLUE);
+                draw_rect(sx + 5, sy,      3,  3, SETTINGS_BLUE);
+                draw_rect(sx + 12,sy,      3,  3, SETTINGS_BLUE);
+                draw_rect(sx + 5, sy + 17, 3,  3, SETTINGS_BLUE);
+                draw_rect(sx + 12,sy + 17, 3,  3, SETTINGS_BLUE);
+                // Centre hole
+                draw_rounded_rect(sx + 7, sy + 7, 6, 6, 3, 0x0A0818);
+            }
+            _ => {
+                // Antenna / Network
+                // Mast
+                draw_vline(sx + 9,  sy + 6, 14, ACCENT_TEAL);
+                draw_vline(sx + 10, sy + 6, 14, ACCENT_TEAL);
+                // Signal arcs (3 concentric)
+                draw_hline(sx + 5, sy + 2, 10, ACCENT_TEAL);
+                draw_hline(sx + 3, sy + 4, 14, ACCENT_TEAL);
+                draw_hline(sx + 1, sy + 6, 18, ACCENT_TEAL);
+                // Base
+                draw_hline(sx + 5, sy + 18, 10, ACCENT_TEAL);
+            }
+        }
         ii += 1;
     }
     draw_hline(rx + 8, TOP_BAR_H + 138, PANEL_W - 16, GLASS_BORDER);
     draw_str(rx + 16, TOP_BAR_H + 156, "RESOURCES", 0x44446A);
-    let edb_pct = if state.entry_count > 0 { (state.entry_count * 100 / 32) as u32 } else { 0 };
-    let bar_w: u32 = PANEL_W - 32;
+    let bar_w: u32 = PANEL_W - 48;
     let bar_x: u32 = rx + 16;
-    // EDB label then bar below
-    draw_str(rx + 16, TOP_BAR_H + 172, "EDB fill", 0x888899);
+    // PL-65: CPU bar (30% sovereign idle) + MEM bar
+    let cpu_pct: u32 = 30;
+    draw_str(rx + 16, TOP_BAR_H + 172, "CPU", 0x888899);
+    draw_str(rx + PANEL_W - 36, TOP_BAR_H + 172, "30%", 0x888899);
     draw_rect(bar_x, TOP_BAR_H + 182, bar_w, 5, 0x22224A);
-    draw_rect(bar_x, TOP_BAR_H + 182, bar_w * edb_pct / 100, 5, SOVEREIGN_PURPLE);
-    // SIG label then bar below
-    let proof_ok = state.proof == 0x4153;
-    draw_str(rx + 16, TOP_BAR_H + 196, "SIG verify", 0x888899);
-    draw_rect(bar_x, TOP_BAR_H + 206, bar_w, 5, 0x22224A);
-    draw_rect(bar_x, TOP_BAR_H + 206, if proof_ok { bar_w } else { 0 }, 5, ACCENT_TEAL);
-    // OK status shown by full bar color — no separate label needed
-    draw_hline(rx + 8, TOP_BAR_H + 220, PANEL_W - 16, GLASS_BORDER);
-    draw_str(rx + 16, TOP_BAR_H + 238, "NETWORK", 0x44446A);
+    draw_rect(bar_x, TOP_BAR_H + 182, bar_w * cpu_pct / 100, 5, SOVEREIGN_PURPLE);
+    let mem_pct: u32 = 55;
+    draw_str(rx + 16, TOP_BAR_H + 194, "MEM", 0x888899);
+    draw_str(rx + PANEL_W - 36, TOP_BAR_H + 194, "55%", 0x888899);
+    draw_rect(bar_x, TOP_BAR_H + 204, bar_w, 5, 0x22224A);
+    draw_rect(bar_x, TOP_BAR_H + 204, bar_w * mem_pct / 100, 5, ACCENT_TEAL);
+    // Network section
+    draw_hline(rx + 8, TOP_BAR_H + 218, PANEL_W - 16, GLASS_BORDER);
+    draw_str(rx + 16, TOP_BAR_H + 234, "NETWORK", 0x44446A);
     let awp_col = if state.edb_live { ACCENT_TEAL } else { 0x444444 };
-    draw_rect(rx + 16, TOP_BAR_H + 252, 8, 8, awp_col);
-    draw_str(rx + 30, TOP_BAR_H + 260, "AWP  loopback", 0x888899);
-    draw_str(rx + 16, TOP_BAR_H + 276, "EDB:", 0x33334A);
-    draw_hex32(rx + 48, TOP_BAR_H + 276, state.entry_count as u32, 0x44446A);
+    draw_rounded_rect(rx + 16, TOP_BAR_H + 248, 8, 8, 4, awp_col);
+    draw_str(rx + 30, TOP_BAR_H + 256, "AWP mesh active", 0x888899);
+    draw_str(rx + 16, TOP_BAR_H + 270, "0 peers · local only", 0x444466);
 
 
 }
@@ -316,9 +445,9 @@ pub fn render_top_bar_icons(uptime_sec: u64, rtc_hour: u8, rtc_min: u8, rtc_day:
 pub fn render_taskbar(slots: &[(bool, u8, bool)], active: usize) {
     draw_rect(0, DOCK_Y, 1280, DOCK_H, 0x0A0818);
     draw_hline(0, DOCK_Y, 1280, 0x1A1830);
-    // 7 icons x 34px + 6px gap = 280px icons
-    // + 10px left pad + 10px right pad + separator + axos> = ~420px total
-    let dock_w: u32 = 420;
+    // PL-65: 7 icons x 34px + 6px gap + 20px padding = 314px
+    // Full dock, no axos> prompt (removed as redundant)
+    let dock_w: u32 = 314;
     let dock_x: u32 = (1280 - dock_w) / 2;
     let dock_py: u32 = DOCK_Y + 4;
     draw_rounded_rect(dock_x, dock_py, dock_w, 36, 10, 0x100E20);
@@ -453,11 +582,7 @@ pub fn render_taskbar(slots: &[(bool, u8, bool)], active: usize) {
         di += 1;
     }
     // Separator
-    let sep_x = dock_x + 10 + 7 * (icon_w + icon_gap) + 4;
-    draw_rect(sep_x, dock_py + 8, 1, 20, 0x2A2848);
-    // axos> prompt — right of separator, vertically centered
-    draw_str(sep_x + 8, dock_py + 22, "axos>", 0x555570);
-    draw_rect(sep_x + 52, dock_py + 13, 5, 12, SOVEREIGN_PURPLE);
+    // PL-65: no axos> prompt — dock is icons only
     // Open window indicators — teal dot = open, amber dot = minimized
     let mut wi = 0usize;
     while wi < slots.len() {
@@ -472,6 +597,7 @@ pub fn render_taskbar(slots: &[(bool, u8, bool)], active: usize) {
                 4 => 4, // EDB browser -> D
                 7 => 0, // Onyxia browser -> O (diamond icon)
                 8 => 5, // Process window -> I (person/IAM icon)
+                9 => 3, // File Browser -> F (folder icon)
                 _ => 0,
             };
             let dot_x = dock_x + 10 + dock_idx * (icon_w + icon_gap) + icon_w / 2 - 3;
@@ -495,7 +621,7 @@ pub fn render_right_panel_input(virtio_ok: bool) {
 
 pub fn render_input_line(buf: &[u8], len: usize) {
     draw_rect(340, 710, 600, 10, DOCK_BG);
-    draw_str(348, 712, "axos> ", TEXT_DIM);
+    // PL-65: axos> prompt removed
     let n = if len < buf.len() { len } else { buf.len() };
     crate::font::draw_bytes(398, 682, &buf[..n], TEXT_WHITE);
 }
@@ -549,7 +675,7 @@ pub fn clamp_spawn_pos(x: i32, y: i32) -> (i32, i32) {
 pub fn dock_icon_at(x: i32, y: i32) -> Option<u8> {
     let dy = DOCK_Y as i32;
     if y < dy || y > dy + 44 { return None; }
-    let dock_x: i32 = (1280 - 420) / 2;
+    let dock_x: i32 = (1280 - 314) / 2; // matches new dock_w=314
     let icon_w: i32 = 30;
     let icon_gap: i32 = 6;
     let mut i = 0u8;
@@ -586,28 +712,21 @@ pub fn render_window(title: &str, lines: &[&str], w: u32, h: u32) {
     draw_hline(tx.saturating_sub(1), ty + 3,               3, SOVEREIGN_PURPLE);
     draw_hline(tx,                   ty + 4,               1, SOVEREIGN_PURPLE);
     draw_str_16_clipped(wx + 24, wy + 4, title, TEXT_WHITE, wx + w - 52);
-    // Close button (red) — rightmost
-    let cx = wx + w - 18;
-    let cy = wy + 7;
-    draw_rect(cx, cy, 10, 10, CLOSE_RED);
-    blend_rect(cx, cy, 10, 5, 0xFFFFFF, 40);
-    draw_border(cx, cy, 10, 10, 0x8B1A1A);
-    draw_str(cx + 2, cy + 1, "x", TEXT_WHITE);
-    // Maximize button (teal □) — left of close
-    let mx = cx - 16;
-    draw_rect(mx, cy, 10, 10, 0x1A3A3A);
-    blend_rect(mx, cy, 10, 5, 0xFFFFFF, 30);
-    draw_border(mx, cy, 10, 10, ACCENT_TEAL);
-    draw_rect(mx + 2, cy + 2, 6, 1, ACCENT_TEAL); // top inner bar
-    draw_rect(mx + 2, cy + 3, 1, 5, ACCENT_TEAL); // left inner
-    draw_rect(mx + 7, cy + 3, 1, 5, ACCENT_TEAL); // right inner
-    draw_rect(mx + 2, cy + 7, 6, 1, ACCENT_TEAL); // bottom inner
-    // Minimize button (amber _) — left of maximize
-    let mnx = mx - 16;
-    draw_rect(mnx, cy, 10, 10, 0x2A1A00);
-    blend_rect(mnx, cy, 10, 5, 0xFFFFFF, 20);
-    draw_border(mnx, cy, 10, 10, ACCENT_AMBER);
-    draw_rect(mnx + 2, cy + 6, 6, 2, ACCENT_AMBER); // _ underline
+    // PL-65: macOS-style filled circle controls — right side
+    // Red=close, Amber=minimize, Green=maximize
+    let cy = wy + WIN_TITLE_H / 2;
+    // Close (red) — rightmost
+    let cx = wx + w - 14;
+    draw_rounded_rect(cx - 5, cy - 5, 10, 10, 5, 0xC0392B);
+    blend_rect(cx - 5, cy - 5, 10, 5, 0xFFFFFF, 30);
+    // Minimize (amber) — middle
+    let mnx = cx - 18;
+    draw_rounded_rect(mnx - 5, cy - 5, 10, 10, 5, 0xE67E22);
+    blend_rect(mnx - 5, cy - 5, 10, 5, 0xFFFFFF, 30);
+    // Maximize (green) — left of amber
+    let mxx = mnx - 18;
+    draw_rounded_rect(mxx - 5, cy - 5, 10, 10, 5, 0x27AE60);
+    blend_rect(mxx - 5, cy - 5, 10, 5, 0xFFFFFF, 30);
     draw_hline(wx, wy + WIN_TITLE_H, w, ACCENT_TEAL);
     draw_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, WIN_BG);
     blend_rect(wx, wy + WIN_TITLE_H + 1, w, h - WIN_TITLE_H - 1, SOVEREIGN_PURPLE, 12);
@@ -653,7 +772,7 @@ pub fn render_window_input_hw(wx: i32, wy: i32, buf: &[u8], len: usize, focused:
     let y = wy + wh as i32 - 20;
     let y = if y < wy + 30 { wy + 30 } else { y };
     draw_rect((wx + 4) as u32, (y - 2) as u32, ww.saturating_sub(8), 18, WIN_BG);
-    draw_str_16((wx + 8) as u32, (y - 2) as u32, "win> ", ACCENT_TEAL);
+    draw_str_16((wx + 8) as u32, (y - 2) as u32, "axc> ", ACCENT_TEAL);
     if let Ok(txt) = core::str::from_utf8(&buf[..len]) {
         draw_str((wx + 48) as u32, y as u32, txt, TEXT_WHITE);
     }
@@ -821,15 +940,16 @@ pub fn clear_window_sized(w: u32, h: u32) {
 pub fn title_bar_hit(wx: i32, wy: i32, w: u32, click_x: i32, click_y: i32) -> u8 {
     let title_h = WIN_TITLE_H as i32;
     if click_y < wy || click_y > wy + title_h { return 0; }
-    let cx = wx + w as i32 - 18; // close x
-    let cy = wy + 7;
-    let mx = cx - 16;            // maximize x
-    let mnx = mx - 16;           // minimize x
-    let btn_y = cy;
-    let in_y = click_y >= btn_y && click_y < btn_y + 10;
-    if in_y && click_x >= cx && click_x < cx + 10 { return 1; } // close
-    if in_y && click_x >= mx && click_x < mx + 10 { return 2; } // maximize
-    if in_y && click_x >= mnx && click_x < mnx + 10 { return 3; } // minimize
+    let cy = wy + (WIN_TITLE_H / 2) as i32;
+    // Circle centres (right side):
+    let cx  = wx + w as i32 - 14; // close (red)
+    let mnx = cx - 18;             // minimize (amber)
+    let mxx = mnx - 18;            // maximize (green)
+    let r: i32 = 6; // hit radius
+    let in_y = (click_y - cy).abs() <= r;
+    if in_y && (click_x - cx).abs()  <= r { return 1; } // close
+    if in_y && (click_x - mnx).abs() <= r { return 3; } // minimize
+    if in_y && (click_x - mxx).abs() <= r { return 2; } // maximize
     0
 }
 
@@ -1196,4 +1316,135 @@ pub fn render_proc_window(
     // Resize handle
     draw_rect(wx_u + w - 12, (wy + h as i32 - 12) as u32, 12, 12, ACCENT_TEAL);
     draw_rect(wx_u + w - 8,  (wy + h as i32 - 8)  as u32, 4,  4,  TEXT_WHITE);
+}
+
+// ── PL-65: File Browser Window (kind=9) ──────────────────────────────────────
+// Shows AXFS file listing with name, size, type columns.
+// files: array of (name, size_bytes, kind) — kind: 0=.ax 1=.axpkg 2=.txt 3=other
+pub struct FsEntry {
+    pub name:      [u8; 32],
+    pub name_len:  usize,
+    pub size:      u32,
+    pub kind:      u8, // 0=.ax 1=.axpkg 2=.txt 3=other
+}
+
+impl FsEntry {
+    pub const fn empty() -> Self {
+        FsEntry { name: [0u8; 32], name_len: 0, size: 0, kind: 3 }
+    }
+    pub fn name_str(&self) -> &str {
+        core::str::from_utf8(&self.name[..self.name_len]).unwrap_or("?")
+    }
+}
+
+pub fn render_file_browser(
+    wx: i32, wy: i32, w: u32, h: u32,
+    entries: &[FsEntry],
+    count: usize,
+    selected: usize,
+    disk_used: u32,
+    disk_total: u32,
+) {
+    let wx_u = wx as u32;
+    let wy_u = wy as u32;
+
+    // ── Column header ─────────────────────────────────────────────────────────
+    let hdr_y = wy_u + WIN_TITLE_H + 2;
+    draw_rect(wx_u + 1, hdr_y, w - 2, 14, 0x0A0A1A);
+    draw_str(wx_u + 8,  hdr_y + 4, "NAME",      TEXT_DIM);
+    draw_str(wx_u + 200, hdr_y + 4, "TYPE",     TEXT_DIM);
+    draw_str(wx_u + 260, hdr_y + 4, "SIZE",     TEXT_DIM);
+    let sep_y = hdr_y + 14;
+    draw_hline(wx_u + 4, sep_y, w - 8, PANEL_BORDER);
+
+    // ── File rows ─────────────────────────────────────────────────────────────
+    let row_h: u32 = 16;
+    let body_top = sep_y + 2;
+    let avail_h = h.saturating_sub(body_top - wy_u).saturating_sub(40);
+    let max_rows = (avail_h / row_h) as usize;
+    draw_rect(wx_u + 1, body_top, w - 2,
+        avail_h.min(max_rows as u32 * row_h + 4), WIN_BG);
+
+    let n = count.min(max_rows).min(entries.len());
+    let mut row = 0usize;
+    while row < n {
+        let e = &entries[row];
+        let ry = body_top + row as u32 * row_h;
+        let is_sel = row == selected;
+
+        // Row highlight
+        if is_sel {
+            draw_rect(wx_u + 2, ry, w - 4, row_h - 1, 0x1A1A38);
+            draw_hline(wx_u + 2, ry, w - 4, SOVEREIGN_PURPLE);
+        }
+
+        // Kind icon + colour
+        let (type_str, name_col) = match e.kind {
+            0 => (".ax",    ACCENT_TEAL),
+            1 => (".axpkg", ACCENT_AMBER),
+            2 => (".txt",   TEXT_WHITE),
+            _ => ("file",   TEXT_DIM),
+        };
+
+        // Kind dot
+        let dot_col = match e.kind {
+            0 => ACCENT_TEAL,
+            1 => ACCENT_AMBER,
+            2 => 0x8888FF,
+            _ => TEXT_DIM,
+        };
+        draw_rect(wx_u + 6, ry + 5, 5, 5, dot_col);
+
+        // Name
+        draw_str_clipped(wx_u + 16, ry + 4, e.name_str(), name_col, wx_u + 196);
+
+        // Type
+        draw_str(wx_u + 200, ry + 4, type_str, TEXT_DIM);
+
+        // Size
+        // Format bytes as "NNN B" or "N.N K"
+        if e.size >= 1024 {
+            let kb = e.size / 1024;
+            let hex = [b'0' + (kb / 10) as u8, b'0' + (kb % 10) as u8, b' ', b'K', b'B'];
+            if let Ok(s) = core::str::from_utf8(&hex) {
+                draw_str(wx_u + 260, ry + 4, s, TEXT_DIM);
+            }
+        } else {
+            let b1 = if e.size >= 100 { b'0' + (e.size / 100) as u8 } else { b' ' };
+            let b2 = if e.size >= 10  { b'0' + ((e.size / 10) % 10) as u8 } else { b' ' };
+            let b3 = b'0' + (e.size % 10) as u8;
+            let sz = [b1, b2, b3, b' ', b'B'];
+            if let Ok(s) = core::str::from_utf8(&sz) {
+                draw_str(wx_u + 260, ry + 4, s, TEXT_DIM);
+            }
+        }
+        row += 1;
+    }
+
+    if count == 0 {
+        draw_str(wx_u + 16, body_top + 8, "[empty filesystem]", TEXT_DIM);
+    }
+
+    // ── Disk usage footer ─────────────────────────────────────────────────────
+    let foot_y = wy_u + h - 32;
+    draw_hline(wx_u + 4, foot_y, w - 8, PANEL_BORDER);
+    // "Disk 1: NNN/NNN B"
+    draw_str(wx_u + 8, foot_y + 6, "Disk 1", ACCENT_TEAL);
+    draw_str(wx_u + 52, foot_y + 6, "sovereign AXFS", TEXT_DIM);
+    // Usage bar
+    let used_pct = if disk_total > 0 { disk_used * 100 / disk_total } else { 0 };
+    let ubar_w = w.saturating_sub(20);
+    draw_rect(wx_u + 8, foot_y + 18, ubar_w, 6, 0x22224A);
+    draw_rect(wx_u + 8, foot_y + 18, ubar_w * used_pct / 100, 6, SOVEREIGN_PURPLE);
+    // Pct label
+    let p1 = b'0' + (used_pct / 10) as u8;
+    let p2 = b'0' + (used_pct % 10) as u8;
+    let pct_str = [p1, p2, b'%', b' ', b'u', b's', b'e', b'd'];
+    if let Ok(s) = core::str::from_utf8(&pct_str) {
+        draw_str(wx_u + w - 60, foot_y + 6, s, TEXT_DIM);
+    }
+
+    // Resize handle
+    draw_rect(wx_u + w - 12, wy_u + h - 12, 12, 12, ACCENT_TEAL);
+    draw_rect(wx_u + w - 8,  wy_u + h - 8,   4,  4, TEXT_WHITE);
 }
