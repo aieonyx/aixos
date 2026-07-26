@@ -1138,103 +1138,219 @@ pub fn render_file_browser(
 ) {
     let wx_u = wx as u32;
     let wy_u = wy as u32;
+    let content_y = wy_u + WIN_TITLE_H + 1;
+    let content_h = h.saturating_sub(WIN_TITLE_H + 1);
 
-    // ── Column header ─────────────────────────────────────────────────────────
-    let hdr_y = wy_u + WIN_TITLE_H + 2;
-    draw_rect(wx_u + 1, hdr_y, w - 2, 14, 0x0A0A1A);
-    draw_str(wx_u + 8,  hdr_y + 4, "NAME",      TEXT_DIM);
-    draw_str(wx_u + 200, hdr_y + 4, "TYPE",     TEXT_DIM);
-    draw_str(wx_u + 260, hdr_y + 4, "SIZE",     TEXT_DIM);
-    let sep_y = hdr_y + 14;
-    draw_hline(wx_u + 4, sep_y, w - 8, PANEL_BORDER);
+    // ── Three-panel layout: sidebar | file list | preview ─────────────────────
+    let sidebar_w: u32 = 130;
+    let preview_w: u32 = 160;
+    let main_x    = wx_u + sidebar_w + 1;
+    let main_w    = w.saturating_sub(sidebar_w + preview_w + 2);
+    let preview_x = wx_u + w - preview_w;
 
-    // ── File rows ─────────────────────────────────────────────────────────────
-    let row_h: u32 = 16;
-    let body_top = sep_y + 2;
-    let avail_h = h.saturating_sub(body_top - wy_u).saturating_sub(40);
-    let max_rows = (avail_h / row_h) as usize;
-    draw_rect(wx_u + 1, body_top, w - 2,
-        avail_h.min(max_rows as u32 * row_h + 4), WIN_BG);
+    // ── Left sidebar ──────────────────────────────────────────────────────────
+    draw_rect(wx_u, content_y, sidebar_w, content_h, 0x07070F);
+    draw_vline(wx_u + sidebar_w, content_y, content_h, PANEL_BORDER);
+    draw_str(wx_u + 8, content_y + 8, "SOVEREIGN FILES", 0x33334A);
 
-    let n = count.min(max_rows).min(entries.len());
+    let nav_items: [(&str, u32); 8] = [
+        ("Home",         0x888899),
+        ("Workspace",    TEXT_WHITE),
+        ("Projects",     0x888899),
+        ("Documents",    0x888899),
+        ("Downloads",    0x888899),
+        ("Secure Vault", ACCENT_TEAL),
+        ("Shared",       0x888899),
+        ("Trash",        0x664444),
+    ];
+    let mut ni = 0u32;
+    while ni < 8 {
+        let ny = content_y + 24 + ni * 22;
+        let (label, col) = nav_items[ni as usize];
+        if ni == 1 {
+            draw_rect(wx_u + 4, ny - 2, sidebar_w - 8, 18, 0x1A1A38);
+            draw_rect(wx_u + 4, ny - 2, 3, 18, SOVEREIGN_PURPLE);
+        }
+        let dot_col = match ni { 5 => ACCENT_TEAL, 7 => 0x664444, _ => 0x33334A };
+        draw_rect(wx_u + 10, ny + 4, 6, 6, dot_col);
+        draw_str_clipped(wx_u + 22, ny + 2, label, col, wx_u + sidebar_w - 4);
+        ni += 1;
+    }
+
+    // Storage section at sidebar bottom
+    let stor_y = content_y + content_h - 44;
+    draw_hline(wx_u + 6, stor_y - 4, sidebar_w - 12, PANEL_BORDER);
+    draw_str(wx_u + 8, stor_y, "Storage", 0x44446A);
+    let used_pct = if disk_total > 0 { disk_used * 100 / disk_total } else { 0 };
+    let pct_d = [b'0' + (used_pct / 10) as u8, b'0' + (used_pct % 10) as u8, b'%'];
+    if let Ok(s) = core::str::from_utf8(&pct_d) {
+        draw_str(wx_u + sidebar_w - 28, stor_y, s, 0x44446A);
+    }
+    draw_rect(wx_u + 8, stor_y + 12, sidebar_w - 16, 4, 0x22224A);
+    draw_rect(wx_u + 8, stor_y + 12, (sidebar_w - 16) * used_pct.min(100) / 100, 4, SOVEREIGN_PURPLE);
+    draw_str(wx_u + 8, stor_y + 20, "AXFS local-first", 0x2A2A44);
+    draw_str(wx_u + 8, stor_y + 32, "Sovereign Protected", 0x1A4A2A);
+
+    // ── Main file list ────────────────────────────────────────────────────────
+    draw_rect(main_x, content_y, main_w, content_h, WIN_BG);
+
+    // Nav bar: back/fwd/up + breadcrumb
+    let nav_y = content_y + 2;
+    draw_rect(main_x, nav_y, main_w, 24, 0x0A0A1A);
+    draw_rounded_rect(main_x + 4,  nav_y + 4, 16, 16, 3, 0x1A1A3A);
+    draw_rounded_rect(main_x + 22, nav_y + 4, 16, 16, 3, 0x1A1A3A);
+    draw_rounded_rect(main_x + 40, nav_y + 4, 16, 16, 3, 0x1A1A3A);
+    draw_str(main_x + 8,  nav_y + 12, "<", TEXT_DIM);
+    draw_str(main_x + 26, nav_y + 12, ">", TEXT_DIM);
+    draw_str(main_x + 44, nav_y + 12, "^", TEXT_DIM);
+    draw_rounded_rect(main_x + 60, nav_y + 4, main_w - 68, 16, 3, 0x0D0D22);
+    draw_border(main_x + 60, nav_y + 4, main_w - 68, 16, PANEL_BORDER);
+    draw_str_clipped(main_x + 66, nav_y + 12, "Home / Workspace", TEXT_DIM, main_x + main_w - 8);
+
+    // Column headers
+    let hdr_y = nav_y + 26;
+    draw_rect(main_x, hdr_y, main_w, 14, 0x0A0A1A);
+    draw_str(main_x + 36,             hdr_y + 3, "Name",     TEXT_DIM);
+    draw_str(main_x + main_w - 86,    hdr_y + 3, "Modified", TEXT_DIM);
+    draw_str(main_x + main_w - 26,    hdr_y + 3, "Size",     TEXT_DIM);
+    draw_hline(main_x, hdr_y + 14, main_w, PANEL_BORDER);
+
+    // File rows
+    let row_h:    u32 = 22;
+    let footer_h: u32 = 22;
+    let body_top  = hdr_y + 15;
+    let body_h    = content_h.saturating_sub(body_top - content_y + footer_h);
+    let max_rows  = (body_h / row_h) as usize;
+    let n         = count.min(max_rows).min(entries.len());
+
     let mut row = 0usize;
     while row < n {
-        let e = &entries[row];
-        let ry = body_top + row as u32 * row_h;
+        let e   = &entries[row];
+        let ry  = body_top + row as u32 * row_h;
         let is_sel = row == selected;
 
-        // Row highlight
         if is_sel {
-            draw_rect(wx_u + 2, ry, w - 4, row_h - 1, 0x1A1A38);
-            draw_hline(wx_u + 2, ry, w - 4, SOVEREIGN_PURPLE);
+            draw_rect(main_x, ry, main_w, row_h - 1, 0x141438);
+            draw_hline(main_x, ry, main_w, SOVEREIGN_PURPLE);
+        } else if row % 2 == 0 {
+            draw_rect(main_x, ry, main_w, row_h - 1, 0x09091A);
         }
 
-        // Kind icon + colour
-        let (type_str, name_col) = match e.kind {
-            0 => (".ax",    ACCENT_TEAL),
-            1 => (".axpkg", ACCENT_AMBER),
-            2 => (".txt",   TEXT_WHITE),
-            _ => ("file",   TEXT_DIM),
+        let (icon_col, type_label) = match e.kind {
+            0 => (ACCENT_TEAL,  ".ax"),
+            1 => (ACCENT_AMBER, ".axpkg"),
+            2 => (0x7777FF,     ".txt"),
+            _ => (TEXT_DIM,     "file"),
         };
-
-        // Kind dot
-        let dot_col = match e.kind {
-            0 => ACCENT_TEAL,
-            1 => ACCENT_AMBER,
-            2 => 0x8888FF,
-            _ => TEXT_DIM,
-        };
-        draw_rect(wx_u + 6, ry + 5, 5, 5, dot_col);
+        // File icon
+        draw_rounded_rect(main_x + 6, ry + 4, 14, 14, 2, icon_col);
+        blend_rect(main_x + 6, ry + 4, 14, 14, 0x000000, 120);
+        let init = match e.kind { 0 => "a", 1 => "p", 2 => "t", _ => "f" };
+        draw_str(main_x + 10, ry + 11, init, TEXT_WHITE);
 
         // Name
-        draw_str_clipped(wx_u + 16, ry + 4, e.name_str(), name_col, wx_u + 196);
+        let nc = if is_sel { TEXT_WHITE } else { 0xCCCCEE };
+        draw_str_clipped(main_x + 26, ry + 7, e.name_str(), nc, main_x + main_w - 100);
 
         // Type
-        draw_str(wx_u + 200, ry + 4, type_str, TEXT_DIM);
+        draw_str(main_x + main_w - 88, ry + 7, type_label, TEXT_DIM);
 
         // Size
-        // Format bytes as "NNN B" or "N.N K"
         if e.size >= 1024 {
             let kb = e.size / 1024;
-            let hex = [b'0' + (kb / 10) as u8, b'0' + (kb % 10) as u8, b' ', b'K', b'B'];
-            if let Ok(s) = core::str::from_utf8(&hex) {
-                draw_str(wx_u + 260, ry + 4, s, TEXT_DIM);
-            }
+            let s1 = [b'0'+(kb/10) as u8, b'0'+(kb%10) as u8, b'K', b'B'];
+            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(main_x + main_w - 30, ry + 7, s, TEXT_DIM); }
         } else {
-            let b1 = if e.size >= 100 { b'0' + (e.size / 100) as u8 } else { b' ' };
-            let b2 = if e.size >= 10  { b'0' + ((e.size / 10) % 10) as u8 } else { b' ' };
-            let b3 = b'0' + (e.size % 10) as u8;
-            let sz = [b1, b2, b3, b' ', b'B'];
-            if let Ok(s) = core::str::from_utf8(&sz) {
-                draw_str(wx_u + 260, ry + 4, s, TEXT_DIM);
-            }
+            let b1 = if e.size >= 10 { b'0' + (e.size/10) as u8 } else { b' ' };
+            let s1 = [b1, b'0' + (e.size % 10) as u8, b' ', b'B'];
+            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(main_x + main_w - 30, ry + 7, s, TEXT_DIM); }
         }
         row += 1;
     }
 
     if count == 0 {
-        draw_str(wx_u + 16, body_top + 8, "[empty filesystem]", TEXT_DIM);
+        draw_str(main_x + 16, body_top + 12, "[empty filesystem]", TEXT_DIM);
     }
 
-    // ── Disk usage footer ─────────────────────────────────────────────────────
-    let foot_y = wy_u + h - 32;
-    draw_hline(wx_u + 4, foot_y, w - 8, PANEL_BORDER);
-    // "Disk 1  sovereign AXFS"
-    draw_str(wx_u + 8,  foot_y + 6, "Disk 1", ACCENT_TEAL);
-    draw_str(wx_u + 58, foot_y + 6, "sovereign AXFS", TEXT_DIM);
-    // Usage bar
-    let used_pct = if disk_total > 0 { disk_used * 100 / disk_total } else { 0 };
-    let ubar_w = w.saturating_sub(20);
-    draw_rect(wx_u + 8, foot_y + 18, ubar_w, 6, 0x22224A);
-    draw_rect(wx_u + 8, foot_y + 18, ubar_w * used_pct / 100, 6, SOVEREIGN_PURPLE);
-    // Pct label — left aligned after "Disk 1  sovereign AXFS"
-    let p1 = b'0' + (used_pct / 10) as u8;
-    let p2 = b'0' + (used_pct % 10) as u8;
-    let pct_str = [p1, p2, b'%'];
-    if let Ok(s) = core::str::from_utf8(&pct_str) {
-        draw_str(wx_u + 8, foot_y + 6, s, TEXT_DIM); // shown at right via w calc below
-        // Right-align percentage
-        draw_str(wx_u + w - 32, foot_y + 6, s, TEXT_DIM);
+    // Footer
+    let foot_y = content_y + content_h - footer_h;
+    draw_hline(main_x, foot_y, main_w, PANEL_BORDER);
+    draw_rect(main_x, foot_y + 1, main_w, footer_h - 1, 0x07070F);
+    // Item count
+    let c1 = b'0' + (count / 10) as u8;
+    let c2 = b'0' + (count % 10) as u8;
+    let cnt = [c1, c2];
+    if let Ok(s) = core::str::from_utf8(&cnt) { draw_str(main_x + 8, foot_y + 8, s, TEXT_DIM); }
+    draw_str(main_x + 22, foot_y + 8, "items", TEXT_DIM);
+    // Protection badge
+    draw_rounded_rect(main_x + main_w - 110, foot_y + 5, 12, 12, 3, ACCENT_TEAL);
+    blend_rect(main_x + main_w - 110, foot_y + 5, 12, 12, 0x000000, 80);
+    draw_str(main_x + main_w - 104, foot_y + 12, "S", ACCENT_TEAL);
+    draw_str(main_x + main_w - 94, foot_y + 8, "Sovereign Protected", 0x33334A);
+
+    // Separator
+    draw_vline(preview_x, content_y, content_h, PANEL_BORDER);
+
+    // ── Right preview panel ───────────────────────────────────────────────────
+    draw_rect(preview_x, content_y, preview_w, content_h, 0x07070F);
+
+    if count > 0 && selected < count {
+        let e = &entries[selected];
+        let (type_name, icon_col): (&str, u32) = match e.kind {
+            0 => ("AXON Script",       ACCENT_TEAL),
+            1 => ("Sovereign Package", ACCENT_AMBER),
+            2 => ("Text Document",     0x7777FF),
+            _ => ("File",              TEXT_DIM),
+        };
+
+        // Large icon
+        let fi_x = preview_x + preview_w / 2 - 20;
+        let fi_y = content_y + 14;
+        draw_rounded_rect(fi_x, fi_y, 40, 40, 6, icon_col);
+        blend_rect(fi_x, fi_y, 40, 40, 0x000000, 140);
+        blend_rect(fi_x, fi_y, 40, 20, 0xFFFFFF, 20);
+        let big_init = match e.kind { 0 => "AX", 1 => "PKG", 2 => "TXT", _ => "FILE" };
+        draw_str(fi_x + 10, fi_y + 24, big_init, TEXT_WHITE);
+
+        // File name + type
+        draw_str_clipped(preview_x + 8, fi_y + 48, e.name_str(), TEXT_WHITE, preview_x + preview_w - 4);
+        draw_str_clipped(preview_x + 8, fi_y + 62, type_name, TEXT_DIM, preview_x + preview_w - 4);
+
+        draw_hline(preview_x + 8, fi_y + 76, preview_w - 16, PANEL_BORDER);
+
+        // Metadata
+        let meta_y = fi_y + 84;
+        draw_str(preview_x + 8,  meta_y,      "Type",     TEXT_DIM);
+        draw_str_clipped(preview_x + 56, meta_y, type_name, TEXT_WHITE, preview_x + preview_w - 4);
+        draw_str(preview_x + 8,  meta_y + 20, "Size",     TEXT_DIM);
+        if e.size >= 1024 {
+            let kb = e.size / 1024;
+            let s1 = [b'0'+(kb/10)as u8, b'0'+(kb%10)as u8, b'K', b'B'];
+            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(preview_x + 56, meta_y + 20, s, TEXT_WHITE); }
+        } else {
+            let s1 = [b'0'+(e.size/10)as u8, b'0'+(e.size%10)as u8, b' ', b'B'];
+            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(preview_x + 56, meta_y + 20, s, TEXT_WHITE); }
+        }
+        draw_str(preview_x + 8,  meta_y + 40, "Location", TEXT_DIM);
+        draw_str(preview_x + 8,  meta_y + 52, "/Workspace", 0x44446A);
+
+        // Action buttons
+        let btn_y = meta_y + 68;
+        let btn_w = preview_w - 16;
+        draw_rounded_rect(preview_x + 8, btn_y,      btn_w, 20, 4, SOVEREIGN_PURPLE);
+        blend_rect(preview_x + 8, btn_y, btn_w, 10, 0xFFFFFF, 20);
+        draw_str(preview_x + 16, btn_y + 12, "Open", TEXT_WHITE);
+
+        draw_rounded_rect(preview_x + 8, btn_y + 26, btn_w, 20, 4, 0x0D2A1A);
+        draw_border(preview_x + 8, btn_y + 26, btn_w, 20, ACCENT_TEAL);
+        draw_str(preview_x + 16, btn_y + 38, "Verify", ACCENT_TEAL);
+
+        draw_rounded_rect(preview_x + 8, btn_y + 52, btn_w, 20, 4, 0x1A1500);
+        draw_border(preview_x + 8, btn_y + 52, btn_w, 20, ACCENT_AMBER);
+        draw_str(preview_x + 16, btn_y + 64, "Encrypt", ACCENT_AMBER);
+    } else {
+        draw_str(preview_x + 16, content_y + 60, "Select a file", TEXT_DIM);
+        draw_str(preview_x + 16, content_y + 76, "to preview", TEXT_DIM);
     }
 
     // Resize handle

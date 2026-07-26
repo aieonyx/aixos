@@ -1222,6 +1222,13 @@ fn handle_dock_click(x: i32, y: i32) {
                 if let Some(slot) = find_free() {
                     wins()[slot].open = true;
                     wins()[slot].kind = kind;
+                    // File browser needs more space for 3-panel layout
+                    if kind == 9 {
+                        wins()[slot].w = 820;
+                        wins()[slot].h = 500;
+                        wins()[slot].x = aixos_gpu::desktop::CANVAS_X_MIN;
+                        wins()[slot].y = aixos_gpu::desktop::CANVAS_Y_MIN;
+                    }
                     ACTIVE_WIN = slot;
                 }
                 // If no free slot, do nothing (all 5 windows open)
