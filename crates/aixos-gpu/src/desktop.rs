@@ -1102,7 +1102,7 @@ pub fn render_proc_window(
     let foot_y = (wy + h as i32 - 18) as u32;
     draw_hline(wx_u + 4, foot_y - 2, w - 8, PANEL_BORDER);
     draw_str(wx_u + 8,  foot_y + 2, "PL-62 cooperative scheduler", TEXT_DIM);
-    draw_str(wx_u + w - 90, foot_y + 2, "R=run W=wait B=blk D=dead", 0x333355);
+    draw_str(wx_u + w - 130, foot_y + 2, "R=run W=wait B=blk D=dead", 0x333355);
 
     // Resize handle
     draw_rect(wx_u + w - 12, (wy + h as i32 - 12) as u32, 12, 12, ACCENT_TEAL);
@@ -1219,20 +1219,22 @@ pub fn render_file_browser(
     // ── Disk usage footer ─────────────────────────────────────────────────────
     let foot_y = wy_u + h - 32;
     draw_hline(wx_u + 4, foot_y, w - 8, PANEL_BORDER);
-    // "Disk 1: NNN/NNN B"
-    draw_str(wx_u + 8, foot_y + 6, "Disk 1", ACCENT_TEAL);
-    draw_str(wx_u + 52, foot_y + 6, "sovereign AXFS", TEXT_DIM);
+    // "Disk 1  sovereign AXFS"
+    draw_str(wx_u + 8,  foot_y + 6, "Disk 1", ACCENT_TEAL);
+    draw_str(wx_u + 58, foot_y + 6, "sovereign AXFS", TEXT_DIM);
     // Usage bar
     let used_pct = if disk_total > 0 { disk_used * 100 / disk_total } else { 0 };
     let ubar_w = w.saturating_sub(20);
     draw_rect(wx_u + 8, foot_y + 18, ubar_w, 6, 0x22224A);
     draw_rect(wx_u + 8, foot_y + 18, ubar_w * used_pct / 100, 6, SOVEREIGN_PURPLE);
-    // Pct label
+    // Pct label — left aligned after "Disk 1  sovereign AXFS"
     let p1 = b'0' + (used_pct / 10) as u8;
     let p2 = b'0' + (used_pct % 10) as u8;
-    let pct_str = [p1, p2, b'%', b' ', b'u', b's', b'e', b'd'];
+    let pct_str = [p1, p2, b'%'];
     if let Ok(s) = core::str::from_utf8(&pct_str) {
-        draw_str(wx_u + w - 60, foot_y + 6, s, TEXT_DIM);
+        draw_str(wx_u + 8, foot_y + 6, s, TEXT_DIM); // shown at right via w calc below
+        // Right-align percentage
+        draw_str(wx_u + w - 32, foot_y + 6, s, TEXT_DIM);
     }
 
     // Resize handle
