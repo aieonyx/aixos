@@ -1210,9 +1210,9 @@ pub fn render_file_browser(
     // Column headers
     let hdr_y = nav_y + 26;
     draw_rect(main_x, hdr_y, main_w, 14, 0x0A0A1A);
-    draw_str(main_x + 36,          hdr_y + 3, "Name",  TEXT_DIM);
-    draw_str(main_x + main_w - 56, hdr_y + 3, "Type",  TEXT_DIM);
-    draw_str(main_x + main_w - 28, hdr_y + 3, "Size",  TEXT_DIM);
+    draw_str(main_x + 36,           hdr_y + 3, "Name", TEXT_DIM);
+    draw_str(main_x + main_w - 72,  hdr_y + 3, "Type", TEXT_DIM);
+    draw_str(main_x + main_w - 32,  hdr_y + 3, "Size", TEXT_DIM);
     draw_hline(main_x, hdr_y + 14, main_w, PANEL_BORDER);
 
     // File rows
@@ -1252,18 +1252,18 @@ pub fn render_file_browser(
         let nc = if is_sel { TEXT_WHITE } else { 0xCCCCEE };
         draw_str_clipped(main_x + 26, ry + 7, e.name_str(), nc, main_x + main_w - 100);
 
-        // Type badge - right-aligned
-        draw_str(main_x + main_w - 58, ry + 7, type_label, TEXT_DIM);
+        // Type badge - aligned with header
+        draw_str(main_x + main_w - 74, ry + 7, type_label, TEXT_DIM);
 
-        // Size
+        // Size - right aligned with header
         if e.size >= 1024 {
             let kb = e.size / 1024;
             let s1 = [b'0'+(kb/10) as u8, b'0'+(kb%10) as u8, b'K', b'B'];
-            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(main_x + main_w - 30, ry + 7, s, TEXT_DIM); }
+            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(main_x + main_w - 32, ry + 7, s, TEXT_DIM); }
         } else {
             let b1 = if e.size >= 10 { b'0' + (e.size/10) as u8 } else { b' ' };
             let s1 = [b1, b'0' + (e.size % 10) as u8, b' ', b'B'];
-            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(main_x + main_w - 30, ry + 7, s, TEXT_DIM); }
+            if let Ok(s) = core::str::from_utf8(&s1) { draw_str(main_x + main_w - 32, ry + 7, s, TEXT_DIM); }
         }
         row += 1;
     }

@@ -1769,7 +1769,7 @@ fn handle_click(x: i32, y: i32) {
                     let preview_w: i32 = 160;
                     let main_x = w.x + sidebar_w + 1;
                     let preview_x = w.x + w.w as i32 - preview_w;
-                    let content_y = w.y + 24;
+                    let content_y = w.y + 25; // WIN_TITLE_H=24, content starts at wy+25
                     // File row click — select file
                     let nav_h: i32 = 26;
                     let hdr_h: i32 = 14;
@@ -1810,42 +1810,45 @@ fn handle_click(x: i32, y: i32) {
                         let fname = &entry.name[..entry.name_len];
                         match FB_ACTION {
                             1 => {
-                                // Open: run .ax file via axon_interp, or verify+run .axpkg
-                                if let Some(idx) = aixos_axfs::find(fname) {
-                                    if let Some(f) = aixos_axfs::file_at(idx) {
-                                        let script = f.data_bytes();
-                                        let result = aixos_shell::axon_interp::exec(
-                                            script,
-                                            aixos_identity::node_id(),
-                                            if aixos_net::virtio_net::is_live() {
-                                                Some(|nid:u64,p:&[u8]| aixos_net::virtio_net::send_awp_frame(nid,p))
-                                            } else { None },
-                                        );
-                                        // Store output in AXFS_BUF for shell display
-                                        let out = result.as_str();
-                                        let len = out.len().min(510);
-                                        AXFS_BUF_LEN = len;
-                                        let mut ii=0; while ii<len{AXFS_BUF[ii]=out[ii];ii+=1;}
+                                // Open: find file by name then run via axon_interp
+                                if let Some(f) = aixos_axfs::file_at(FB_SELECTED) {
+                                    let script = f.data_bytes();
+                                    let result = aixos_shell::axon_interp::exec(
+                                        script,
+                                        aixos_identity::node_id(),
+                                        if aixos_net::virtio_net::is_live() {
+                                            Some(|nid:u64,p:&[u8]| aixos_net::virtio_net::send_awp_frame(nid,p))
+                                        } else { None },
+                                    );
+                                    let out = result.as_str();
+                                    let len = out.len().min(510);
+                                    AXFS_BUF_LEN = len;
+                                    let mut ii=0; while ii<len{AXFS_BUF[ii]=out[ii];ii+=1;}
+                                    // Open shell window to show output
+                                    if find_kind(1).is_none() {
+                                        if let Some(slot) = find_free() {
+                                            wins()[slot].open = true;
+                                            wins()[slot].kind = 1;
+                                            WINDOW_FOCUSED = true;
+                                        }
                                     }
                                 }
                             }
                             2 => {
-                                // Verify: run verify_axpkg and show result
-                                if let Some(idx) = aixos_axfs::find(fname) {
-                                    if let Some(f) = aixos_axfs::file_at(idx) {
-                                        let data = f.data_bytes();
-                                        match aixos_kernel::verify::verify_axpkg(data) {
-                                            aixos_kernel::verify::VerifyGate::Pass { name:_, script:_, caps:_ } => {
-                                                let msg = b"VERIFIED: package integrity OK";
-                                                AXFS_BUF_LEN = msg.len();
-                                                let mut ii=0; while ii<msg.len(){AXFS_BUF[ii]=msg[ii];ii+=1;}
-                                            }
-                                            aixos_kernel::verify::VerifyGate::Reject(reason) => {
-                                                let msg = reason.as_str().as_bytes();
-                                                let l = msg.len().min(510);
-                                                AXFS_BUF_LEN = l;
-                                                let mut ii=0; while ii<l{AXFS_BUF[ii]=msg[ii];ii+=1;}
-                                            }
+                                // Verify: run verify_axpkg on selected file
+                                if let Some(f) = aixos_axfs::file_at(FB_SELECTED) {
+                                    let data = f.data_bytes();
+                                    match aixos_kernel::verify::verify_axpkg(data) {
+                                        aixos_kernel::verify::VerifyGate::Pass { name:_, script:_, caps:_ } => {
+                                            let msg = b"VERIFIED: package integrity OK";
+                                            AXFS_BUF_LEN = msg.len();
+                                            let mut ii=0; while ii<msg.len(){AXFS_BUF[ii]=msg[ii];ii+=1;}
+                                        }
+                                        aixos_kernel::verify::VerifyGate::Reject(reason) => {
+                                            let msg = reason.as_str().as_bytes();
+                                            let l = msg.len().min(510);
+                                            AXFS_BUF_LEN = l;
+                                            let mut ii=0; while ii<l{AXFS_BUF[ii]=msg[ii];ii+=1;}
                                         }
                                     }
                                 }
