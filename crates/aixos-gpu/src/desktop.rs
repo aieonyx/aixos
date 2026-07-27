@@ -81,20 +81,14 @@ pub fn render_splash() {
     // Full black background
     draw_rect(0, 0, 1280, 720, 0x00000A);
 
-    // Subtle warm glow behind logo
+    // Official AIEONYX logo (192x128) — transparent PNG, no background
     let cx: u32 = 640;
     let cy: u32 = 300;
-    blend_rect(cx.saturating_sub(120), cy.saturating_sub(80), 240, 160, 0xC65A1E, 5);
-    blend_rect(cx.saturating_sub(80),  cy.saturating_sub(60), 160, 120, 0xFFB347, 9);
-    blend_rect(cx.saturating_sub(60),  cy.saturating_sub(40), 120,  80, 0xFFB347, 15);
-
-    // Official AIEONYX logo (192x128) — logo includes the AIEONYX text
-    // Centre horizontally, position so bar sits nicely below
     let logo_x = cx.saturating_sub(crate::aieonyx_logo::LOGO_W / 2);
     let logo_y = cy.saturating_sub(crate::aieonyx_logo::LOGO_H / 2);
     crate::aieonyx_logo::blit(logo_x, logo_y);
 
-    // Progress bar track — sits below the logo
+    // Progress bar track below the logo
     let bar_x: u32 = cx.saturating_sub(200);
     let bar_y: u32 = logo_y + crate::aieonyx_logo::LOGO_H + 24;
     let bar_w: u32 = 400;
