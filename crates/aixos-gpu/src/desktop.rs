@@ -81,27 +81,22 @@ pub fn render_splash() {
     // Full black background
     draw_rect(0, 0, 1280, 720, 0x00000A);
 
-    // Subtle warm glow behind logo (ember gold radial)
+    // Subtle warm glow behind logo
     let cx: u32 = 640;
-    let cy: u32 = 290;
-    blend_rect(cx.saturating_sub(100), cy.saturating_sub(100), 200, 200, 0xC65A1E, 6);
-    blend_rect(cx.saturating_sub(70),  cy.saturating_sub(70),  140, 140, 0xFFB347, 10);
-    blend_rect(cx.saturating_sub(50),  cy.saturating_sub(50),  100, 100, 0xFFB347, 18);
+    let cy: u32 = 300;
+    blend_rect(cx.saturating_sub(120), cy.saturating_sub(80), 240, 160, 0xC65A1E, 5);
+    blend_rect(cx.saturating_sub(80),  cy.saturating_sub(60), 160, 120, 0xFFB347, 9);
+    blend_rect(cx.saturating_sub(60),  cy.saturating_sub(40), 120,  80, 0xFFB347, 15);
 
-    // Official AIEONYX logo — 128x128 centred at (576, 226)
+    // Official AIEONYX logo (192x128) — logo includes the AIEONYX text
+    // Centre horizontally, position so bar sits nicely below
     let logo_x = cx.saturating_sub(crate::aieonyx_logo::LOGO_W / 2);
     let logo_y = cy.saturating_sub(crate::aieonyx_logo::LOGO_H / 2);
     crate::aieonyx_logo::blit(logo_x, logo_y);
 
-    // AIEONYX wordmark — sized to match 128px logo width (~128px text)
-    // draw_str_2x renders at ~14px per char × 7 chars = 98px → fits under logo
-    let word_x = cx.saturating_sub(49); // 7 chars × 14px / 2
-    let word_y = logo_y + crate::aieonyx_logo::LOGO_H + 16;
-    draw_str_2x(word_x, word_y, "AIEONYX", 0xDCE8FF);
-
-    // Progress bar track — ember gold outline, 400px wide centred
+    // Progress bar track — sits below the logo
     let bar_x: u32 = cx.saturating_sub(200);
-    let bar_y: u32 = word_y + 36;
+    let bar_y: u32 = logo_y + crate::aieonyx_logo::LOGO_H + 24;
     let bar_w: u32 = 400;
     let bar_h: u32 = 6;
     draw_rect(bar_x, bar_y, bar_w, bar_h, 0x1A1A2A);
@@ -113,10 +108,9 @@ pub fn render_splash() {
 /// stage: 1=hw probe, 2=edb, 3=axfs, 4=heap, 5=proc, 6=desktop
 pub fn render_splash_progress(stage: u32) {
     let cx: u32 = 640;
-    // Must match render_splash word_y calculation
-    // logo_y = 290 - 64 = 226; word_y = 226 + 128 + 16 = 370; bar_y = 370 + 36 = 406
+    // logo_y = 300 - 64 = 236; bar_y = 236 + 128 + 24 = 388
     let bar_x: u32 = cx.saturating_sub(200);
-    let bar_y: u32 = 406;
+    let bar_y: u32 = 388;
     let bar_w: u32 = 400;
     let bar_h: u32 = 6;
 
