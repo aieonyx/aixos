@@ -6,19 +6,23 @@ use crate::draw::{draw_rect, draw_border, draw_hline, draw_vline, blend_rect, dr
 use crate::font::{draw_str, draw_str_2x, draw_str_clipped, draw_hex32};
 use crate::font16::{draw_str_16, draw_str_16_clipped};
 
-const DARK_BG:          u32 = 0x0D0B1F;
-const DARK_BG2:         u32 = 0x1A0E2E;
-const PANEL_BG:         u32 = 0x141428;
-const PANEL_BORDER:     u32 = 0x2A2A4A;
-const TEXT_WHITE:       u32 = 0xEEEEFF;
-const TEXT_DIM:         u32 = 0x666688;
-const TOP_BAR:          u32 = 0x080818;
-const DOCK_BG:          u32 = 0x0D0D20;
-const SOVEREIGN_PURPLE: u32 = 0x7B4FDB;
-const ACCENT_TEAL:      u32 = 0x1BAF7A;
-const ACCENT_AMBER:     u32 = 0xD4A017;
-const SETTINGS_BLUE:    u32 = 0x1B7FC4;
-const BROWSE_GREEN:     u32 = 0x2A7A4A;
+// ── PL-65C: Phoenix Color System ─────────────────────────────────────────────
+// Core: Midnight Blue + Deep Sovereign Blue + Ember Gold + Plum Glow + Dark Orange
+const DARK_BG:          u32 = 0x070E1A; // Midnight Blue deep
+const DARK_BG2:         u32 = 0x0A1630; // Midnight Blue panel
+const PANEL_BG:         u32 = 0x0F1C2E; // Panel background
+const PANEL_BORDER:     u32 = 0x1A3050; // Blue border
+const TEXT_WHITE:       u32 = 0xDCE8FF; // Soft Ice
+const TEXT_DIM:         u32 = 0x4A6A8A; // Muted blue-grey
+const TOP_BAR:          u32 = 0x060C18; // Darkest midnight
+const DOCK_BG:          u32 = 0x0A1428; // Deep dock
+const SOVEREIGN_PURPLE: u32 = 0x6F5BD3; // Plum Glow
+const ACCENT_TEAL:      u32 = 0x1D4ED8; // Deep Sovereign Blue
+const ACCENT_AMBER:     u32 = 0xFFB347; // Ember Gold
+const ACCENT_ORANGE:    u32 = 0xC65A1E; // Dark Orange
+const SETTINGS_BLUE:    u32 = 0x1D4ED8; // Deep Sovereign Blue
+const BROWSE_GREEN:     u32 = 0x1D4ED8; // Unified sovereign blue
+const CLOSE_RED:        u32 = 0xC0392B; // Close button
 const TOP_BAR_H:  u32 = 38;
 const DOCK_Y:     u32 = 676;
 const DOCK_H:     u32 = 44;
@@ -27,8 +31,15 @@ const TASKBAR_Y:  u32 = 676;
 const TASKBAR_H:  u32 = 44;
 const CANVAS_Y:   u32 = 38;
 const CANVAS_H:   u32 = 638;
-const GLASS_PANEL: u32 = 0x0F0D22;
-const GLASS_BORDER: u32 = 0x2A2840;
+const GLASS_PANEL:  u32 = 0x0A1428;
+const GLASS_BORDER: u32 = 0x1A3050;
+const WIN_TITLE:    u32 = 0x0D1A30;
+const WIN_BG:       u32 = 0x080F1C;
+const GLASS_HI:     u32 = 0x1A2E48;
+const GLASS_MID:    u32 = 0x0F1E32;
+const GLASS_LOW:    u32 = 0x08121E;
+const SHADOW:       u32 = 0x00050A;
+
 
 pub struct DesktopState {
     pub node_id:     u64,
@@ -60,56 +71,111 @@ impl DesktopState {
 
 // ── PL-33: Boot Splash Screen ────────────────────────────────────────────────
 
+// ── PL-65C: Phoenix Animated Splash ─────────────────────────────────────────
+// Clean boot screen: official AIEONYX logo (128x128) + wordmark + ember gold
+// progress bar animated across 6 sovereign boot stages.
+
+/// Draw the static splash background + logo + wordmark.
+/// Call once at boot init. Then call render_splash_progress() for each stage.
 pub fn render_splash() {
-    draw_rect(0, 0, 1280, 720, DARK_BG);
+    // Full black background
+    draw_rect(0, 0, 1280, 720, 0x00000A);
+
+    // Subtle warm glow behind logo (ember gold radial)
     let cx: u32 = 640;
-    let cy: u32 = 280;
-    let mut i: u32 = 0;
-    while i <= 48 {
-        let w = i * 2 + 1;
-        let x = cx.saturating_sub(i);
-        let y = cy.saturating_sub(48).saturating_add(i);
-        draw_hline(x, y, w, SOVEREIGN_PURPLE);
-        i += 1;
+    let cy: u32 = 290;
+    blend_rect(cx.saturating_sub(100), cy.saturating_sub(100), 200, 200, 0xC65A1E, 6);
+    blend_rect(cx.saturating_sub(70),  cy.saturating_sub(70),  140, 140, 0xFFB347, 10);
+    blend_rect(cx.saturating_sub(50),  cy.saturating_sub(50),  100, 100, 0xFFB347, 18);
+
+    // Official AIEONYX logo — 128x128 centred at (576, 226)
+    let logo_x = cx.saturating_sub(crate::aieonyx_logo::LOGO_W / 2);
+    let logo_y = cy.saturating_sub(crate::aieonyx_logo::LOGO_H / 2);
+    crate::aieonyx_logo::blit(logo_x, logo_y);
+
+    // AIEONYX wordmark — sized to match 128px logo width (~128px text)
+    // draw_str_2x renders at ~14px per char × 7 chars = 98px → fits under logo
+    let word_x = cx.saturating_sub(49); // 7 chars × 14px / 2
+    let word_y = logo_y + crate::aieonyx_logo::LOGO_H + 16;
+    draw_str_2x(word_x, word_y, "AIEONYX", 0xDCE8FF);
+
+    // Progress bar track — ember gold outline, 400px wide centred
+    let bar_x: u32 = cx.saturating_sub(200);
+    let bar_y: u32 = word_y + 36;
+    let bar_w: u32 = 400;
+    let bar_h: u32 = 6;
+    draw_rect(bar_x, bar_y, bar_w, bar_h, 0x1A1A2A);
+    draw_border(bar_x.saturating_sub(1), bar_y.saturating_sub(1), bar_w + 2, bar_h + 2, 0x2A2A3A);
+}
+
+/// Advance the progress bar to `stage` out of 6.
+/// Call after each real boot stage completes.
+/// stage: 1=hw probe, 2=edb, 3=axfs, 4=heap, 5=proc, 6=desktop
+pub fn render_splash_progress(stage: u32) {
+    let cx: u32 = 640;
+    // Must match render_splash word_y calculation
+    // logo_y = 290 - 64 = 226; word_y = 226 + 128 + 16 = 370; bar_y = 370 + 36 = 406
+    let bar_x: u32 = cx.saturating_sub(200);
+    let bar_y: u32 = 406;
+    let bar_w: u32 = 400;
+    let bar_h: u32 = 6;
+
+    // Fill from left — ember gold gradient
+    let filled = bar_w * stage.min(6) / 6;
+    // Draw filled portion with ember gold → dark orange gradient
+    let mut fx: u32 = 0;
+    while fx < filled {
+        let t = fx * 255 / bar_w;
+        // Ember Gold #FFB347 → Dark Orange #C65A1E
+        let r = (0xFF - (0xFF - 0xC6) * t / 255) as u8;
+        let g = (0xB3 - (0xB3 - 0x5A) * t / 255) as u8;
+        let b = (0x47 - (0x47 - 0x1E) * t / 255) as u8;
+        let col = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
+        draw_vline(bar_x + fx, bar_y, bar_h, col);
+        fx += 1;
     }
-    let mut i: u32 = 1;
-    while i <= 48 {
-        let w = (48 - i) * 2 + 1;
-        let x = cx.saturating_sub(48 - i);
-        let y = cy + i;
-        draw_hline(x, y, w, SOVEREIGN_PURPLE);
-        i += 1;
+
+    // Stage label — small text below bar
+    let label_y = bar_y + bar_h + 8;
+    // Clear previous label
+    draw_rect(bar_x, label_y, bar_w, 10, 0x00000A);
+    let label: &str = match stage {
+        1 => "Hardware probe",
+        2 => "EdisonDB init",
+        3 => "AXFS init",
+        4 => "Sovereign heap",
+        5 => "Process table",
+        6 => "Desktop ready",
+        _ => "",
+    };
+    // Centre the label
+    let label_x = cx.saturating_sub((label.len() as u32 * 8) / 2);
+    draw_str(label_x, label_y, label, 0x4A6A8A);
+
+    // Glow pulse on bar tip
+    if filled > 4 {
+        blend_rect(bar_x + filled - 4, bar_y.saturating_sub(2), 8, bar_h + 4, 0xFFB347, 60);
     }
-    draw_str_2x(584, 370, "AIEONYX", ACCENT_TEAL);
-    // tagline removed
-    draw_str(516, 440, "aiXos Phoenix  v0.1.0  aarch64", TEXT_WHITE);
-    draw_str(504, 460, "axon_main() -> 0x4153  [SOVEREIGN]", ACCENT_TEAL);
-    draw_rect(390, 500, 500, 12, PANEL_BG);
-    draw_rect(390, 500, 500, 12, PANEL_BORDER);
-    draw_rect(392, 502, 496, 8, ACCENT_TEAL);
 }
 
 pub fn render_desktop(state: &DesktopState) {
-    // ── PL-59.2: Rich gradient background ────────────────────────────────────
-    // Top: deep cosmic purple, bottom: near-black navy
-    // Horizontal sweep: subtle purple glow from center
+    // ── PL-65C: Phoenix midnight blue background with warm ember glow ─────────
     let mut by: u32 = 0;
     while by < 720 {
         let ty = by * 255 / 720;
-        // Vertical: dark purple top -> deep navy bottom
-        let r_base = 0x0Du32.saturating_sub(ty / 20);
-        let g_base = 0x08u32;
-        let b_base = 0x1Fu32.saturating_add(ty / 40);
-        // Horizontal sweep per row: brighter toward center x=640
+        // Deep midnight blue gradient top to bottom
+        let r_base = 0x07u32.saturating_add(ty / 60);
+        let g_base = 0x0Eu32.saturating_add(ty / 80);
+        let b_base = 0x1Au32.saturating_add(ty / 30);
         let mut bx: u32 = 0;
         while bx < 1280 {
+            // Subtle warm center glow (ember gold)
             let tx = if bx < 640 { bx * 255 / 640 } else { (1280 - bx) * 255 / 640 };
-            let glow = tx / 20; // subtle center brightening
-            let r = (r_base + glow / 3).min(0x18) as u8;
-            let g = (g_base + glow / 8).min(0x10) as u8;
-            let b = (b_base + glow).min(0x38) as u8;
+            let warm = tx / 28;
+            let r = (r_base + warm / 2).min(0x1A) as u8;
+            let g = (g_base + warm / 6).min(0x16) as u8;
+            let b = (b_base.saturating_sub(warm / 4)).min(0x2A) as u8;
             let color = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
-            // Only draw on canvas (not over panels — save perf)
             if bx >= 188 && bx <= 1092 {
                 use crate::framebuffer::{FRAMEBUFFER, WIDTH};
                 unsafe {
@@ -436,13 +502,7 @@ const WIN_Y: u32 = 110;
 const WIN_W: u32 = 580;
 const WIN_H: u32 = 300;
 const WIN_TITLE_H: u32 = 24;
-const WIN_BG:    u32 = 0x0D0D22;
-const WIN_TITLE: u32 = 0x1A1A3A;
-const GLASS_HI:  u32 = 0x3A3A5A;
-const GLASS_MID: u32 = 0x1E1E38;
-const GLASS_LOW: u32 = 0x111128;
-const SHADOW:    u32 = 0x000008;
-const CLOSE_RED: u32 = 0xC0392B;
+// PL-65C: Colors defined in Phoenix color system above
 
 static mut CUR_WIN_X: i32 = 200;
 static mut CUR_WIN_Y: i32 = 80;

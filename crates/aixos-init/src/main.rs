@@ -699,22 +699,7 @@ pub extern "C" fn aixos_main() -> ! {
     while delay < 10_000_000 { delay += 1; }
 
     let virtio_ok;
-    aixos_edisondb::init();
-    // PL-50: AXFS init — seeds readme.txt
-    aixos_axfs::init();
-    // PL-55: sovereign heap init
-    uart_write("heap: init ");
-    {
-        let free_kb = aixos_kernel::alloc::bytes_free() / 1024;
-        // Just log — bump allocator needs no explicit init
-        uart_write("sovereign heap ready\n");
-        let _ = free_kb;
-        // Make a boot allocation as proof
-        let _proof = aixos_kernel::alloc::alloc_val::<u64>(0x4153u64);
-    }
-    // PL-62: register sovereign system processes
-    aixos_kernel::proc::boot_register();
-    uart_write("proc: [kernel][shell][desktop] registered\n");
+    // PL-65C: EdisonDB/AXFS/heap/proc now initialised inside animated splash stages
     // PL-53: probe virtio-net and send boot AWP frame
     {
         let net_live = aixos_net::virtio_net::init();
@@ -821,13 +806,42 @@ pub extern "C" fn aixos_main() -> ! {
     match aixos_gpu::init() {
         Some(_) => {
             uart_write("GPU: ok\n");
+            // PL-65C: Phoenix animated splash — stage 1: hardware probe
             aixos_gpu::desktop::render_splash();
-            // Volatile read prevents optimizer from eliminating the delay
-            let mut splash_delay = 0u64;
-            while splash_delay < 1_200_000_000 {
-                unsafe { core::ptr::read_volatile(&splash_delay); }
-                splash_delay += 1;
+            aixos_gpu::desktop::render_splash_progress(1);
+            // Brief pause so stage 1 is visible
+            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
+
+            // Stage 2: EdisonDB
+            aixos_edisondb::init();
+            aixos_gpu::desktop::render_splash_progress(2);
+            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
+
+            // Stage 3: AXFS
+            aixos_axfs::init();
+            aixos_gpu::desktop::render_splash_progress(3);
+            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
+
+            // Stage 4: Sovereign heap
+            uart_write("heap: init ");
+            {
+                let free_kb = aixos_kernel::alloc::bytes_free() / 1024;
+                uart_write("sovereign heap ready\n");
+                let _ = free_kb;
+                let _proof = aixos_kernel::alloc::alloc_val::<u64>(0x4153u64);
             }
+            aixos_gpu::desktop::render_splash_progress(4);
+            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
+
+            // Stage 5: Process table
+            aixos_kernel::proc::boot_register();
+            uart_write("proc: [kernel][shell][desktop] registered\n");
+            aixos_gpu::desktop::render_splash_progress(5);
+            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
+
+            // Stage 6: Desktop ready
+            aixos_gpu::desktop::render_splash_progress(6);
+            let mut d = 0u64; while d < 200_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
             unsafe {
             #[cfg(target_arch = "aarch64")]
             {

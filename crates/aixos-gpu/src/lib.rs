@@ -5,6 +5,7 @@
 pub mod commands;
 pub mod font16;
 pub mod logo;
+pub mod aieonyx_logo; // PL-65C: official 128x128 ARGB logo
 pub mod icons; // PL-65A: 32x32 ARGB sovereign icon bitmaps
 pub mod cursor;
 pub mod draw;
