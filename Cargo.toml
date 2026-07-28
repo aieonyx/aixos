@@ -37,4 +37,4 @@ inherits  = "release"
 strip     = false
 panic     = "abort"
 opt-level = "s"
-lto       = true
+lto       = false
