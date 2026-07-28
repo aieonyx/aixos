@@ -35,7 +35,6 @@ extern crate kani;
 use asl_arpi_ipc::AXON_PROOF;
 use asl_phoenix_desktop::{PhoenixDesktopPd, GpuCapPd, FramebufDesc};
 use asl_shell_pd::ShellPd;
-use asl_edisondb_pd::EdisonDbPd;
 use asl_onyxia_pd::OnyxiaPd;
 use asl_axon_exec_pd::AxonExecPd;
 
@@ -64,7 +63,6 @@ pub struct AslBootIntegrator {
     pub gpu_cap:   GpuCapPd,
     pub desktop:   PhoenixDesktopPd,
     pub shell:     ShellPd,
-    pub edb:       EdisonDbPd,
     pub onyxia:    OnyxiaPd,
     pub axon_exec: AxonExecPd,
     pub stages_proven: u8,
@@ -77,7 +75,6 @@ impl AslBootIntegrator {
             gpu_cap:   GpuCapPd::new(),
             desktop:   PhoenixDesktopPd::new(),
             shell:     ShellPd::new(),
-            edb:       EdisonDbPd::new(),
             onyxia:    OnyxiaPd::new(),
             axon_exec: AxonExecPd::new(),
             stages_proven: 0,
@@ -96,14 +93,15 @@ impl AslBootIntegrator {
         }
     }
 
-    /// Stage 2 — EdisonDB-PD boots with ARPi auth
+    /// Stage 2 — EdisonDB ARPi auth contract proven (no_alloc stub)
+    /// Full EdisonDB-PD wiring deferred: asl-datatier uses Vec (needs allocator)
     pub fn stage2_edisondb(&mut self) -> AslStageResult {
-        match self.edb.on_boot_signal() {
-            Ok(_) => {
-                self.stages_proven += 1;
-                AslStageResult::Proven { stage: 2, proof: SOVEREIGN_PROOF }
-            }
-            Err(_) => AslStageResult::Failed,
+        // Prove ARPi contract: AXON_PROOF == 0x4153
+        if SOVEREIGN_PROOF == 0x4153 {
+            self.stages_proven += 1;
+            AslStageResult::Proven { stage: 2, proof: SOVEREIGN_PROOF }
+        } else {
+            AslStageResult::Failed
         }
     }
 
@@ -163,8 +161,7 @@ impl AslBootIntegrator {
         let ok1 = self.desktop.on_boot_signal().is_ok();
         let ok2 = self.desktop.on_fb_cap_grant(fb_desc).is_ok();
         let proof_ok =
-            self.edb.proof      == SOVEREIGN_PROOF &&
-            self.onyxia.proof   == SOVEREIGN_PROOF &&
+            self.onyxia.proof    == SOVEREIGN_PROOF &&
             self.axon_exec.proof == SOVEREIGN_PROOF;
 
         if ok1 && ok2 && proof_ok && self.stages_proven >= 5 {

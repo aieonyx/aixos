@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Edison Lepiten / AIEONYX
 # SPDX-License-Identifier: Apache-2.0
-# PL-76: aixos-asl — ASL-seL4 integration bridge for aiXos Phoenix
-# Bare-metal no_std — only includes PDs that are Vec-free
+# PL-76: aixos-asl — ASL-seL4 integration bridge (bare-metal no_std/no_alloc)
+# Only includes PDs with pure no_alloc dependency chains
 
 [package]
 name        = "aixos-asl"
@@ -12,17 +12,16 @@ license     = "Apache-2.0"
 description = "ASL-seL4 integration bridge — sovereign PD contracts in aiXos boot"
 
 [dependencies]
-# Only pure no_std/no_alloc ASL PDs (asl-haniel uses Vec — excluded)
+# Pure no_std/no_alloc PDs only
+# asl-edisondb-pd excluded: depends on asl-datatier (Vec)
+# asl-haniel-canvas-pd excluded: depends on asl-haniel (Vec)
+# asl-sovereign-boot-proof excluded: depends on asl-haniel-canvas-pd
 asl-common           = { path = "../../asl/asl-common" }
 asl-arpi-ipc         = { path = "../../asl/asl-arpi-ipc" }
 asl-phoenix-desktop  = { path = "../../asl/pds/asl-phoenix-desktop" }
 asl-shell-pd         = { path = "../../asl/pds/asl-shell-pd" }
-asl-edisondb-pd      = { path = "../../asl/pds/asl-edisondb-pd" }
 asl-onyxia-pd        = { path = "../../asl/pds/asl-onyxia-pd" }
 asl-axon-exec-pd     = { path = "../../asl/pds/asl-axon-exec-pd" }
-# asl-haniel-canvas-pd excluded — depends on asl-haniel which uses Vec
-# asl-sovereign-boot-proof excluded — depends on asl-haniel-canvas-pd
-# asl-arpi-broker-live excluded — depends on asl-haniel via onyxia
 
 [features]
 default = []
