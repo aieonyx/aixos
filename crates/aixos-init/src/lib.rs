@@ -4,6 +4,7 @@
 #![no_std]
 #![allow(static_mut_refs)]
 #![allow(clippy::empty_loop)]
+#![allow(clippy::manual_strip)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::needless_return)]

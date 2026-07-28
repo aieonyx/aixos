@@ -1,5 +1,6 @@
 #![allow(clippy::nonminimal_bool)]
 #![allow(clippy::eq_op)]
+#![allow(clippy::manual_is_multiple_of)]
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
 // AXFS — Sovereign File System (PL-50 stub, PL-56 persistent)
