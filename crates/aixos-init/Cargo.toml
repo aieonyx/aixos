@@ -19,6 +19,7 @@ aixos-identity = { path = "../aixos-identity" }
 aixos-net = { path = "../aixos-net" }
 aixos-shell = { path = "../aixos-shell" }
 aixos-edisondb = { path = "../aixos-edisondb" }
+aixos-asl      = { path = "../aixos-asl" }  # PL-76: ASL-seL4 integration
 aixos-gpu = { path = "../aixos-gpu" }
 aixos-input = { path = "../aixos-input" }
 aixos-axfs = { path = "../aixos-axfs" }

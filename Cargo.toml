@@ -11,6 +11,7 @@ members = [
     "crates/aixos-gpu",
     "crates/aixos-input",
     "crates/aixos-axfs",
+    "crates/aixos-asl",
     "crates/axon_interp",
 ]
 
