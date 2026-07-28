@@ -6,11 +6,12 @@
 #![allow(clippy::empty_loop)]
 use core::panic::PanicInfo;
 
-// run_desktop_loop is defined in lib.rs (same crate)
-// Call it directly without crate:: prefix
+// Import from this crate's lib.rs
+use aixos_init::run_desktop_loop;
+
 #[no_mangle]
 pub extern "C" fn aixos_main() -> ! {
-    run_desktop_loop()
+    unsafe { run_desktop_loop() }
 }
 
 #[panic_handler]
