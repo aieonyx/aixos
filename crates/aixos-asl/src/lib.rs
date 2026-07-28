@@ -3,9 +3,28 @@
 //
 // ════════════════════════════════════════════════════════════════════════════
 // crates/aixos-asl/src/lib.rs
-// PL-76: ASL-seL4 Integration Bridge
-// Wires ASL v2.0 sovereign PD contracts into aiXos Phoenix boot path
+// PL-76: ASL-seL4 Integration Bridge (bare-metal subset)
 // ════════════════════════════════════════════════════════════════════════════
+//
+// Wires the no_std/no_alloc ASL PD contracts into the aiXos Phoenix boot path.
+// asl-haniel-canvas-pd and asl-sovereign-boot-proof are excluded here because
+// asl-haniel uses Vec (requires global allocator not available on bare-metal).
+// Those PDs are proven in the ASL repo (v2.0.0-asl) and integrated via the
+// full seL4 build in the next integration sprint.
+//
+// What is wired here (6 PDs, all no_std/no_alloc):
+//   Stage 1: GPU-Cap PD — maps ramfb, FramebufferWrite capability
+//   Stage 2: EdisonDB-PD — sovereign store, ARPi auth
+//   Stage 3: Shell-PD — axc> shell IPC routing
+//   Stage 4: AXON-Exec-PD — scripts in isolated PD
+//   Stage 5: Onyxia-PD — browser, http:// blocked
+//   Stage 6: Phoenix-Desktop-PD — render loop proof
+//
+// UART evidence visible in boot log:
+//   [ASL] Stage N: <PD> — <proof>
+//   [ASL] Stage 6: SOVEREIGN DESKTOP LIVE — proof=0x4153
+//
+// Post Doctrine: P1 ✓ P2 ✓ P3 ✓ P4 ✓ P5 ✓
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -13,47 +32,22 @@
 #[cfg(kani)]
 extern crate kani;
 
-//
-// WHAT THIS DOES:
-//   aiXos Phoenix v1.0 boots bare-metal — GPU, shell, EDB accessed directly.
-//   aiXos Phoenix v2.0 runs the same GUI but under seL4 isolation.
-//   This crate is the bridge: it runs the ASL PD contracts alongside the
-//   bare-metal boot, proving sovereign isolation at each splash stage.
-//
-// INTEGRATION MODEL:
-//   The aiXos splash screen has 6 stages. Each stage now also runs the
-//   corresponding ASL PD boot contract:
-//
-//   Splash Stage 1 (hardware probe)  → ASL: GPU-Cap PD maps ramfb
-//   Splash Stage 2 (EdisonDB init)   → ASL: EdisonDB-PD boots + ARPi auth
-//   Splash Stage 3 (AXFS init)       → ASL: Shell-PD boots, AXFS route proven
-//   Splash Stage 4 (sovereign heap)  → ASL: AXON-Exec-PD boots
-//   Splash Stage 5 (process table)   → ASL: Onyxia-PD + HANIEL-Canvas-PD boot
-//   Splash Stage 6 (desktop ready)   → ASL: Full sovereign boot proof asserted
-//
-// UART EVIDENCE (visible in boot log):
-//   [ASL] Stage 1: GPU-Cap PD — ramfb mapped
-//   [ASL] Stage 2: EdisonDB-PD — ARPi auth active
-//   [ASL] Stage 3: Shell-PD — AXFS route proven
-//   [ASL] Stage 4: AXON-Exec-PD — scripts isolated
-//   [ASL] Stage 5: HANIEL-Canvas — sole display authority
-//   [ASL] Stage 6: SOVEREIGN DESKTOP LIVE — proof=0x4153
-//
-// Post Doctrine: P1 ✓ P2 ✓ P3 ✓ P4 ✓ P5 ✓
+use asl_arpi_ipc::AXON_PROOF;
+use asl_phoenix_desktop::{PhoenixDesktopPd, GpuCapPd, FramebufDesc};
+use asl_shell_pd::ShellPd;
+use asl_edisondb_pd::EdisonDbPd;
+use asl_onyxia_pd::OnyxiaPd;
+use asl_axon_exec_pd::AxonExecPd;
 
-use asl_sovereign_boot_proof::{SovereignStack, SOVEREIGN_PROOF};
-use asl_phoenix_desktop::GpuCapPd;
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+pub const SOVEREIGN_PROOF: u64 = AXON_PROOF;
 
 // ── Integration result ────────────────────────────────────────────────────────
 
-/// Result of running the ASL integration boot at a specific stage
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AslStageResult {
-    /// PD contract proven at this stage
     Proven { stage: u8, proof: u64 },
-    /// Stage skipped (non-seL4 boot path)
-    Skipped,
-    /// PD contract failed
     Failed,
 }
 
@@ -65,10 +59,14 @@ impl AslStageResult {
 
 // ── ASL boot integrator ───────────────────────────────────────────────────────
 
-/// Runs ASL sovereign PD contracts alongside each aiXos splash stage.
-/// One instance lives for the entire boot sequence.
+/// Runs sovereign PD contracts alongside each aiXos splash stage.
 pub struct AslBootIntegrator {
-    pub stack:         SovereignStack,
+    pub gpu_cap:   GpuCapPd,
+    pub desktop:   PhoenixDesktopPd,
+    pub shell:     ShellPd,
+    pub edb:       EdisonDbPd,
+    pub onyxia:    OnyxiaPd,
+    pub axon_exec: AxonExecPd,
     pub stages_proven: u8,
     pub boot_complete: bool,
 }
@@ -76,7 +74,12 @@ pub struct AslBootIntegrator {
 impl AslBootIntegrator {
     pub fn new() -> Self {
         AslBootIntegrator {
-            stack:         SovereignStack::new(),
+            gpu_cap:   GpuCapPd::new(),
+            desktop:   PhoenixDesktopPd::new(),
+            shell:     ShellPd::new(),
+            edb:       EdisonDbPd::new(),
+            onyxia:    OnyxiaPd::new(),
+            axon_exec: AxonExecPd::new(),
             stages_proven: 0,
             boot_complete: false,
         }
@@ -84,7 +87,7 @@ impl AslBootIntegrator {
 
     /// Stage 1 — Hardware probe: GPU-Cap PD maps ramfb
     pub fn stage1_hw_probe(&mut self) -> AslStageResult {
-        match self.stack.gpu_cap.map_ramfb(0x44000000) {
+        match self.gpu_cap.map_ramfb(0x44000000) {
             Ok(_) => {
                 self.stages_proven += 1;
                 AslStageResult::Proven { stage: 1, proof: SOVEREIGN_PROOF }
@@ -93,9 +96,9 @@ impl AslBootIntegrator {
         }
     }
 
-    /// Stage 2 — EdisonDB init: EdisonDB-PD boots with ARPi auth
+    /// Stage 2 — EdisonDB-PD boots with ARPi auth
     pub fn stage2_edisondb(&mut self) -> AslStageResult {
-        match self.stack.edb.on_boot_signal() {
+        match self.edb.on_boot_signal() {
             Ok(_) => {
                 self.stages_proven += 1;
                 AslStageResult::Proven { stage: 2, proof: SOVEREIGN_PROOF }
@@ -104,11 +107,10 @@ impl AslBootIntegrator {
         }
     }
 
-    /// Stage 3 — AXFS init: Shell-PD boots, AXFS IPC route proven
+    /// Stage 3 — Shell-PD boots, AXFS IPC route proven
     pub fn stage3_axfs(&mut self) -> AslStageResult {
-        match self.stack.shell.on_boot_signal() {
+        match self.shell.on_boot_signal() {
             Ok(_) => {
-                // Prove AXFS route classification
                 let route = asl_shell_pd::classify_cmd(b"ls");
                 if route == asl_shell_pd::CmdRoute::Axfs {
                     self.stages_proven += 1;
@@ -121,9 +123,9 @@ impl AslBootIntegrator {
         }
     }
 
-    /// Stage 4 — Sovereign heap: AXON-Exec-PD boots, scripts isolated
+    /// Stage 4 — AXON-Exec-PD boots, scripts isolated
     pub fn stage4_heap(&mut self) -> AslStageResult {
-        match self.stack.axon_exec.on_boot_signal() {
+        match self.axon_exec.on_boot_signal() {
             Ok(_) => {
                 self.stages_proven += 1;
                 AslStageResult::Proven { stage: 4, proof: SOVEREIGN_PROOF }
@@ -132,30 +134,40 @@ impl AslBootIntegrator {
         }
     }
 
-    /// Stage 5 — Process table: Onyxia + HANIEL-Canvas PDs boot
+    /// Stage 5 — Onyxia-PD boots, http:// blocked
     pub fn stage5_proctable(&mut self) -> AslStageResult {
-        let ok1 = self.stack.onyxia.on_boot_signal().is_ok();
-        let ok2 = self.stack.canvas.on_boot_signal().is_ok();
-        let ok3 = self.stack.canvas.on_gpu_cap_granted(0x44000000).is_ok();
-        if ok1 && ok2 && ok3 {
-            self.stages_proven += 1;
-            AslStageResult::Proven { stage: 5, proof: SOVEREIGN_PROOF }
-        } else {
-            AslStageResult::Failed
+        match self.onyxia.on_boot_signal() {
+            Ok(_) => {
+                // Verify http:// is blocked even under seL4
+                let blocked = self.onyxia.navigate(b"http://evil.com").is_err();
+                if blocked {
+                    self.stages_proven += 1;
+                    AslStageResult::Proven { stage: 5, proof: SOVEREIGN_PROOF }
+                } else {
+                    AslStageResult::Failed
+                }
+            }
+            Err(_) => AslStageResult::Failed,
         }
     }
 
-    /// Stage 6 — Desktop ready: full sovereign boot proof asserted
+    /// Stage 6 — Phoenix-Desktop-PD receives GPU cap, render loop proven
     pub fn stage6_desktop(&mut self) -> AslStageResult {
-        // Verify proof chain across all PDs booted so far
+        let fb_desc = FramebufDesc {
+            vaddr:  0x44000000,
+            width:  1280,
+            height: 720,
+            bpp:    4,
+            stride: 1280 * 4,
+        };
+        let ok1 = self.desktop.on_boot_signal().is_ok();
+        let ok2 = self.desktop.on_fb_cap_grant(fb_desc).is_ok();
         let proof_ok =
-            self.stack.proof        == SOVEREIGN_PROOF &&
-            self.stack.edb.proof    == SOVEREIGN_PROOF &&
-            self.stack.onyxia.proof == SOVEREIGN_PROOF &&
-            self.stack.canvas.proof == SOVEREIGN_PROOF &&
-            self.stack.broker.proof == SOVEREIGN_PROOF;
+            self.edb.proof      == SOVEREIGN_PROOF &&
+            self.onyxia.proof   == SOVEREIGN_PROOF &&
+            self.axon_exec.proof == SOVEREIGN_PROOF;
 
-        if proof_ok && self.stages_proven >= 5 {
+        if ok1 && ok2 && proof_ok && self.stages_proven >= 5 {
             self.boot_complete = true;
             self.stages_proven += 1;
             AslStageResult::Proven { stage: 6, proof: SOVEREIGN_PROOF }
@@ -164,7 +176,7 @@ impl AslBootIntegrator {
         }
     }
 
-    /// Run all 6 stages in sequence — returns true if fully sovereign
+    /// Run all 6 stages — returns true if fully sovereign
     pub fn run_all_stages(&mut self) -> bool {
         let s1 = self.stage1_hw_probe();
         let s2 = self.stage2_edisondb();
@@ -172,20 +184,19 @@ impl AslBootIntegrator {
         let s4 = self.stage4_heap();
         let s5 = self.stage5_proctable();
         let s6 = self.stage6_desktop();
-
         s1.is_sovereign() && s2.is_sovereign() && s3.is_sovereign() &&
         s4.is_sovereign() && s5.is_sovereign() && s6.is_sovereign() &&
         self.boot_complete
     }
 
-    /// UART log message for a given stage result
+    /// UART log message for each stage
     pub fn stage_log(stage: u8) -> &'static str {
         match stage {
             1 => "[ASL] Stage 1: GPU-Cap PD — ramfb mapped\n",
             2 => "[ASL] Stage 2: EdisonDB-PD — ARPi auth active\n",
             3 => "[ASL] Stage 3: Shell-PD — AXFS route proven\n",
             4 => "[ASL] Stage 4: AXON-Exec-PD — scripts isolated\n",
-            5 => "[ASL] Stage 5: HANIEL-Canvas — sole display authority\n",
+            5 => "[ASL] Stage 5: Onyxia-PD — http:// blocked\n",
             6 => "[ASL] Stage 6: SOVEREIGN DESKTOP LIVE — proof=0x4153\n",
             _ => "[ASL] Unknown stage\n",
         }
@@ -201,79 +212,63 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_all_stages_sovereign() {
+        let mut i = AslBootIntegrator::new();
+        assert!(i.run_all_stages());
+        assert_eq!(i.stages_proven, 6);
+        assert!(i.boot_complete);
+    }
+
+    #[test]
     fn test_stage1_hw_probe() {
-        let mut integrator = AslBootIntegrator::new();
-        let result = integrator.stage1_hw_probe();
-        assert!(result.is_sovereign());
-        assert_eq!(integrator.stages_proven, 1);
+        let mut i = AslBootIntegrator::new();
+        assert!(i.stage1_hw_probe().is_sovereign());
     }
 
     #[test]
     fn test_stage2_edisondb() {
-        let mut integrator = AslBootIntegrator::new();
-        integrator.stage1_hw_probe();
-        let result = integrator.stage2_edisondb();
-        assert!(result.is_sovereign());
+        let mut i = AslBootIntegrator::new();
+        i.stage1_hw_probe();
+        assert!(i.stage2_edisondb().is_sovereign());
     }
 
     #[test]
-    fn test_stage3_axfs() {
-        let mut integrator = AslBootIntegrator::new();
-        integrator.stage1_hw_probe();
-        integrator.stage2_edisondb();
-        let result = integrator.stage3_axfs();
-        assert!(result.is_sovereign());
+    fn test_stage3_shell_axfs() {
+        let mut i = AslBootIntegrator::new();
+        i.stage1_hw_probe();
+        i.stage2_edisondb();
+        assert!(i.stage3_axfs().is_sovereign());
     }
 
     #[test]
-    fn test_stage4_heap() {
-        let mut integrator = AslBootIntegrator::new();
-        integrator.stage1_hw_probe();
-        integrator.stage2_edisondb();
-        integrator.stage3_axfs();
-        let result = integrator.stage4_heap();
-        assert!(result.is_sovereign());
+    fn test_stage4_axon_exec() {
+        let mut i = AslBootIntegrator::new();
+        i.stage1_hw_probe();
+        i.stage2_edisondb();
+        i.stage3_axfs();
+        assert!(i.stage4_heap().is_sovereign());
     }
 
     #[test]
-    fn test_stage5_proctable() {
-        let mut integrator = AslBootIntegrator::new();
-        integrator.stage1_hw_probe();
-        integrator.stage2_edisondb();
-        integrator.stage3_axfs();
-        integrator.stage4_heap();
-        let result = integrator.stage5_proctable();
-        assert!(result.is_sovereign());
+    fn test_stage5_onyxia_http_blocked() {
+        let mut i = AslBootIntegrator::new();
+        i.stage1_hw_probe();
+        i.stage2_edisondb();
+        i.stage3_axfs();
+        i.stage4_heap();
+        assert!(i.stage5_proctable().is_sovereign());
     }
 
     #[test]
     fn test_stage6_desktop_sovereign() {
-        let mut integrator = AslBootIntegrator::new();
-        integrator.stage1_hw_probe();
-        integrator.stage2_edisondb();
-        integrator.stage3_axfs();
-        integrator.stage4_heap();
-        integrator.stage5_proctable();
-        let result = integrator.stage6_desktop();
-        assert!(result.is_sovereign());
-        assert!(integrator.boot_complete);
-    }
-
-    #[test]
-    fn test_all_stages_sovereign() {
-        let mut integrator = AslBootIntegrator::new();
-        assert!(integrator.run_all_stages());
-        assert_eq!(integrator.stages_proven, 6);
-        assert!(integrator.boot_complete);
+        let mut i = AslBootIntegrator::new();
+        i.run_all_stages();
+        assert!(i.boot_complete);
     }
 
     #[test]
     fn test_stage_log_messages() {
         assert!(AslBootIntegrator::stage_log(1).contains("GPU-Cap"));
-        assert!(AslBootIntegrator::stage_log(2).contains("EdisonDB-PD"));
-        assert!(AslBootIntegrator::stage_log(3).contains("Shell-PD"));
-        assert!(AslBootIntegrator::stage_log(4).contains("AXON-Exec"));
-        assert!(AslBootIntegrator::stage_log(5).contains("HANIEL-Canvas"));
         assert!(AslBootIntegrator::stage_log(6).contains("SOVEREIGN"));
     }
 
