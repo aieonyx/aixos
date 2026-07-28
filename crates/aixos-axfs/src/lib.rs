@@ -1,5 +1,6 @@
 #![allow(clippy::nonminimal_bool)]
 #![allow(clippy::eq_op)]
+#![allow(clippy::redundant_comparisons)]
 #![allow(clippy::manual_is_multiple_of)]
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
