@@ -3,6 +3,16 @@
 version = 4
 
 [[package]]
+name = "aixos-asl"
+version = "2.0.0"
+dependencies = [
+ "asl-arpi-ipc",
+ "asl-axon-exec-pd",
+ "asl-common",
+ "asl-shell-pd",
+]
+
+[[package]]
 name = "aixos-axfs"
 version = "0.1.0"
 dependencies = [
@@ -36,6 +46,7 @@ dependencies = [
 name = "aixos-init"
 version = "0.1.0"
 dependencies = [
+ "aixos-asl",
  "aixos-axfs",
  "aixos-edisondb",
  "aixos-gpu",
@@ -65,12 +76,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "aixos-phoenix-pd"
+version = "0.1.0"
+dependencies = [
+ "aixos-init",
+]
+
+[[package]]
 name = "aixos-shell"
 version = "0.1.0"
 dependencies = [
  "aixos-haniel",
  "aixos-kernel",
  "axon_interp",
+]
+
+[[package]]
+name = "asl-arpi-ipc"
+version = "0.1.0"
+dependencies = [
+ "asl-common",
+]
+
+[[package]]
+name = "asl-axon-bridge"
+version = "0.1.0"
+dependencies = [
+ "asl-common",
+]
+
+[[package]]
+name = "asl-axon-exec-pd"
+version = "0.1.0"
+dependencies = [
+ "asl-arpi-ipc",
+ "asl-axon-bridge",
+ "asl-common",
+ "asl-shell-pd",
+]
+
+[[package]]
+name = "asl-common"
+version = "0.1.0"
+
+[[package]]
+name = "asl-shell-pd"
+version = "0.1.0"
+dependencies = [
+ "asl-arpi-ipc",
+ "asl-common",
 ]
 
 [[package]]

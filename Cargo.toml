@@ -13,6 +13,7 @@ members = [
     "crates/aixos-axfs",
     "crates/aixos-asl",
     "crates/axon_interp",
+    "crates/aixos-phoenix-pd",
 ]
 
 [workspace.package]
@@ -30,3 +31,10 @@ panic = "abort"
 strip = true
 
 [profile.dev]
+
+[profile.microkit]
+inherits  = "release"
+strip     = false
+panic     = "abort"
+opt-level = "s"
+lto       = true

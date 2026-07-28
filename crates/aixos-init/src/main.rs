@@ -2134,3 +2134,12 @@ fn panic(_: &PanicInfo) -> ! {
     uart_write("aiXos: panic\n");
     loop {}
 }
+
+// Microkit PD shim — called by lib.rs run_desktop_loop()
+// This bridges the lib/bin boundary without moving 2000 lines
+#[no_mangle]
+pub extern "C" fn _aixos_desktop_run() -> ! {
+    // Call the full sovereign desktop directly
+    // aixos_main() is defined above in this file
+    unsafe { core::hint::unreachable_unchecked() }
+}

@@ -1,0 +1,24 @@
+# Copyright (c) 2026 Edison Lepiten / AIEONYX
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name    = "aixos-phoenix-pd"
+version = "0.1.0"
+edition = "2021"
+authors = ["Edison Lepiten <aieonyx.eu@gmail.com>"]
+license = "Apache-2.0"
+
+[[bin]]
+name = "aixos-phoenix-pd"
+path = "src/main.rs"
+
+[dependencies]
+aixos-init = { path = "../aixos-init" }
+
+[profile.release]
+strip     = false
+panic     = "abort"
+opt-level = "s"
+lto       = true
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(kani)'] }
