@@ -1,0 +1,9 @@
+# Copyright (c) 2026 Edison Lepiten / AIEONYX
+# Microkit SDK linker config — local build only
+# CI skips this crate (not in CI build matrix)
+[target.aarch64-unknown-none]
+rustflags = [
+    "-C", "link-arg=-T/home/edisonbl/aixos/microkit-sdk-1.4.1/board/qemu_virt_aarch64/release/lib/microkit.ld",
+    "-C", "link-arg=-L/home/edisonbl/aixos/microkit-sdk-1.4.1/board/qemu_virt_aarch64/release/lib",
+    "-C", "link-arg=-lmicrokit",
+]
