@@ -2,13 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // aixos-init lib -- sovereign desktop exposed to Microkit PDs
 #![no_std]
-#![allow(static_mut_refs)]
 
-// Pull in all the sovereign crates so they're available in the rlib
-extern crate aixos_kernel;
-extern crate aixos_identity;
-extern crate aixos_gpu;
-extern crate aixos_input;
+pub const SOVEREIGN_PROOF: u64 = 0x4153;
 
 const UART: *mut u8 = 0x09000000 as *mut u8;
 
@@ -18,8 +13,6 @@ fn uart_write(s: &str) {
     }
 }
 
-pub const SOVEREIGN_PROOF: u64 = 0x4153;
-
 /// Run sovereign boot orchestration stages
 pub fn orchestrate() -> u64 {
     uart_write("aiXos Phoenix -- Sovereign Stack Initializing\n");
@@ -28,7 +21,7 @@ pub fn orchestrate() -> u64 {
 }
 
 /// Enter the aiXos sovereign desktop loop under seL4
-/// This is the real desktop — framebuffer, shell, GPU, EdisonDB
+/// Safety: call once from Microkit PD init()
 pub fn run_desktop_loop() -> ! {
     uart_write("[aiXos] sovereign desktop loop active under seL4\r\n");
     uart_write("[aiXos] Shell ready -- S4+i enforced\r\n");
@@ -37,5 +30,6 @@ pub fn run_desktop_loop() -> ! {
     uart_write("[aiXos] AXON: script runtime isolated\r\n");
     uart_write("[aiXos] Inverted Admin Model: USER=sovereign PLATFORM=connector\r\n");
     uart_write("[aiXos] proof=0x4153 -- all systems sovereign\r\n");
+    #[allow(clippy::empty_loop)]
     loop {}
 }
