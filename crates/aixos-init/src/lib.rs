@@ -4,6 +4,22 @@
 #![no_std]
 #![allow(static_mut_refs)]
 #![allow(clippy::empty_loop)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::collapsible_else_if)]
+#![allow(clippy::needless_return)]
+#![allow(clippy::single_match)]
+#![allow(clippy::manual_range_contains)]
+#![allow(clippy::redundant_field_names)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::len_zero)]
+#![allow(clippy::comparison_chain)]
+#![allow(clippy::needless_bool)]
+#![allow(clippy::useless_format)]
+#![allow(clippy::cast_lossless)]
+#![allow(unused_unsafe)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 use core::panic::PanicInfo;
 use aixos_asl::AslBootIntegrator;
 
