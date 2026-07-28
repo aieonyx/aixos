@@ -7,7 +7,7 @@
 use core::panic::PanicInfo;
 
 // PL-76: ASL-seL4 integration bridge
-extern crate aixos_asl;
+use aixos_asl::AslBootIntegrator;
 
 const UART0: *mut u8 = 0x09000000 as *mut u8;
 
@@ -811,27 +811,27 @@ pub extern "C" fn aixos_main() -> ! {
             uart_write("GPU: ok\n");
 
             // PL-76: ASL integration — sovereign PD contracts run alongside boot
-            let mut asl = aixos_asl::AslBootIntegrator::new();
+            let mut asl = AslBootIntegrator::new();
 
             // Stage 1: Hardware probe + ASL GPU-Cap PD
             aixos_gpu::desktop::render_splash();
             aixos_gpu::desktop::render_splash_progress(1);
             let s1 = asl.stage1_hw_probe();
-            if s1.is_sovereign() { uart_write(aixos_asl::AslBootIntegrator::stage_log(1)); }
+            if s1.is_sovereign() { uart_write(AslBootIntegrator::stage_log(1)); }
             let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
 
             // Stage 2: EdisonDB + ASL EdisonDB-PD
             aixos_edisondb::init();
             aixos_gpu::desktop::render_splash_progress(2);
             let s2 = asl.stage2_edisondb();
-            if s2.is_sovereign() { uart_write(aixos_asl::AslBootIntegrator::stage_log(2)); }
+            if s2.is_sovereign() { uart_write(AslBootIntegrator::stage_log(2)); }
             let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
 
             // Stage 3: AXFS + ASL Shell-PD
             aixos_axfs::init();
             aixos_gpu::desktop::render_splash_progress(3);
             let s3 = asl.stage3_axfs();
-            if s3.is_sovereign() { uart_write(aixos_asl::AslBootIntegrator::stage_log(3)); }
+            if s3.is_sovereign() { uart_write(AslBootIntegrator::stage_log(3)); }
             let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
 
             // Stage 4: Sovereign heap + ASL AXON-Exec-PD
@@ -844,7 +844,7 @@ pub extern "C" fn aixos_main() -> ! {
             }
             aixos_gpu::desktop::render_splash_progress(4);
             let s4 = asl.stage4_heap();
-            if s4.is_sovereign() { uart_write(aixos_asl::AslBootIntegrator::stage_log(4)); }
+            if s4.is_sovereign() { uart_write(AslBootIntegrator::stage_log(4)); }
             let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
 
             // Stage 5: Process table + ASL Onyxia + HANIEL-Canvas PDs
@@ -852,14 +852,14 @@ pub extern "C" fn aixos_main() -> ! {
             uart_write("proc: [kernel][shell][desktop] registered\n");
             aixos_gpu::desktop::render_splash_progress(5);
             let s5 = asl.stage5_proctable();
-            if s5.is_sovereign() { uart_write(aixos_asl::AslBootIntegrator::stage_log(5)); }
+            if s5.is_sovereign() { uart_write(AslBootIntegrator::stage_log(5)); }
             let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
 
             // Stage 6: Desktop ready + ASL full boot proof
             aixos_gpu::desktop::render_splash_progress(6);
             let s6 = asl.stage6_desktop();
             if s6.is_sovereign() {
-                uart_write(aixos_asl::AslBootIntegrator::stage_log(6));
+                uart_write(AslBootIntegrator::stage_log(6));
                 uart_write("[ASL] v2.0.0 — 10 PDs — seL4 isolation proven\n");
             }
             let mut d = 0u64; while d < 200_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }

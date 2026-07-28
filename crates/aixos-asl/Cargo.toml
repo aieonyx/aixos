@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Edison Lepiten / AIEONYX
 # SPDX-License-Identifier: Apache-2.0
 # PL-76: aixos-asl — ASL-seL4 integration bridge for aiXos Phoenix
-# Wires ASL v2.0.0 sovereign PD contracts into the aiXos boot path
+# no_std — compiles for aarch64-unknown-none bare-metal
 
 [package]
 name        = "aixos-asl"
@@ -13,28 +13,20 @@ description = "ASL-seL4 integration bridge — wires sovereign PD contracts into
 
 [dependencies]
 # ASL PD crates (path = submodule at asl/)
-asl-common           = { path = "../../asl/asl-common" }
-asl-arpi-ipc         = { path = "../../asl/asl-arpi-ipc" }
-asl-phoenix-desktop  = { path = "../../asl/pds/asl-phoenix-desktop" }
-asl-shell-pd         = { path = "../../asl/pds/asl-shell-pd" }
-asl-edisondb-pd      = { path = "../../asl/pds/asl-edisondb-pd" }
-asl-onyxia-pd        = { path = "../../asl/pds/asl-onyxia-pd" }
-asl-arpi-broker-live = { path = "../../asl/pds/asl-arpi-broker-live" }
-asl-axon-exec-pd     = { path = "../../asl/pds/asl-axon-exec-pd" }
-asl-haniel-canvas-pd = { path = "../../asl/pds/asl-haniel-canvas-pd",
-                          features = ["std"] }
-asl-sovereign-boot-proof = { path = "../../asl/pds/asl-sovereign-boot-proof",
-                              features = ["std"] }
+# NO std feature — all crates compile no_std for aarch64-unknown-none
+asl-common               = { path = "../../asl/asl-common" }
+asl-arpi-ipc             = { path = "../../asl/asl-arpi-ipc" }
+asl-phoenix-desktop      = { path = "../../asl/pds/asl-phoenix-desktop" }
+asl-shell-pd             = { path = "../../asl/pds/asl-shell-pd" }
+asl-edisondb-pd          = { path = "../../asl/pds/asl-edisondb-pd" }
+asl-onyxia-pd            = { path = "../../asl/pds/asl-onyxia-pd" }
+asl-arpi-broker-live     = { path = "../../asl/pds/asl-arpi-broker-live" }
+asl-axon-exec-pd         = { path = "../../asl/pds/asl-axon-exec-pd" }
+asl-haniel-canvas-pd     = { path = "../../asl/pds/asl-haniel-canvas-pd" }
+asl-sovereign-boot-proof = { path = "../../asl/pds/asl-sovereign-boot-proof" }
 
 [features]
-default = ["std"]
-std     = [
-    "asl-haniel-canvas-pd/std",
-    "asl-sovereign-boot-proof/std",
-]
-
-[dev-dependencies]
-# none — integration tests run in host tests
+default = []
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(kani)'] }

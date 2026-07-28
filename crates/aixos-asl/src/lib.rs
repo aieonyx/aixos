@@ -6,6 +6,13 @@
 // PL-76: ASL-seL4 Integration Bridge
 // Wires ASL v2.0 sovereign PD contracts into aiXos Phoenix boot path
 // ════════════════════════════════════════════════════════════════════════════
+
+#![no_std]
+#![forbid(unsafe_code)]
+
+#[cfg(kani)]
+extern crate kani;
+
 //
 // WHAT THIS DOES:
 //   aiXos Phoenix v1.0 boots bare-metal — GPU, shell, EDB accessed directly.
