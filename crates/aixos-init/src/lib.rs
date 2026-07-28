@@ -20,6 +20,8 @@
 #![allow(clippy::redundant_static_lifetimes)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::unnecessary_cast)]
+#![allow(clippy::duplicated_attributes)]
+#![allow(unused_mut)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::needless_return)]
