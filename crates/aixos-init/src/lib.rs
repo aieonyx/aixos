@@ -20,6 +20,11 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::suspicious_operation_groupings)]
+#![allow(clippy::nonminimal_bool)]
+#![allow(clippy::eq_op)]
+#![allow(clippy::identity_op)]
 use core::panic::PanicInfo;
 use aixos_asl::AslBootIntegrator;
 
