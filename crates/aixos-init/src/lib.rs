@@ -17,7 +17,7 @@ pub fn orchestrate() -> u64 {
 /// Enter the full aiXos sovereign desktop loop under seL4
 #[allow(clippy::empty_loop)]
 pub fn run_desktop_loop() -> ! {
-    unsafe { aixos_main() }
+    sovereign_desktop_main()
 }
 
 const UART0: *mut u8 = 0x09000000 as *mut u8;
@@ -690,7 +690,7 @@ static mut USER_NAME_BUF: [u8; 32] = [0u8; 32];
 static mut USER_NAME_LEN: usize = 0;
 
 #[no_mangle]
-pub extern "C" fn aixos_main() -> ! {
+pub fn sovereign_desktop_main() -> ! {
     uart_write("aiXos Phoenix - Sovereign Stack Initializing...\n");
 
     #[cfg(target_arch = "aarch64")]
