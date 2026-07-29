@@ -1935,8 +1935,13 @@ fn handle_click(x: i32, y: i32) {
     }
 }
 
+#[allow(unreachable_code)]
 fn read_rtc() -> (u8, u8, u8, u8) {
-    return (0, 0, 0, 0); // seL4 PL-81: PL031 not mapped
+    // seL4 PL-81: PL031 at 0x09010000 not mapped — return zeros
+    #[cfg(not(target_arch = "aarch64"))]
+    { return (0, 0, 0, 0); }
+    #[cfg(target_arch = "aarch64")]
+    { return (0, 0, 0, 0); }
     #[cfg(target_arch = "aarch64")]
     unsafe {
         let ts = core::ptr::read_volatile((PL031_BASE + PL031_DR) as *const u32) as u64;
