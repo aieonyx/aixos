@@ -130,6 +130,8 @@ pub fn is_initialized() -> bool {
 
 #[inline(never)]
 pub fn probe() -> Option<(usize, u32)> {
+    // seL4 PL-81: virtio-input scan deferred
+    return None;
     let uart = 0x09000000 as *mut u8;
     unsafe { write_volatile(uart, b'P'); }
     for slot in 0..MMIO_SLOT_COUNT {

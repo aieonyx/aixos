@@ -4,9 +4,9 @@
 // Fix: cache maintenance, physical addresses, FEATURES_OK
 #![allow(dead_code)]
 
-const MMIO_SCAN_BASE: usize = 0x0a00_0000;
+const MMIO_SCAN_BASE: usize = 0x0a003a00;  // seL4: first real device slot  // seL4: devices at top of range
 const MMIO_STEP:      usize = 0x200;
-const MMIO_SLOTS:     usize = 32;
+const MMIO_SLOTS:     usize = 4;  // seL4: 4 slots from top  // seL4: 4 slots from top  // seL4: covers first 8 virtio slots safely
 
 const OFF_MAGIC:       usize = 0x000;
 const OFF_VERSION:     usize = 0x004;
@@ -162,27 +162,12 @@ pub fn init() -> bool {
             let magic     = read32(base, OFF_MAGIC);
             let version   = read32(base, OFF_VERSION);
             let device_id = read32(base, OFF_DEVICE_ID);
-            if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID && setup(base) {
+            if magic == VIRTIO_MAGIC && version == VIRTIO_V1 && device_id == BLK_DEVICE_ID {
+                    // seL4 PL-81: device detected — DMA ring setup deferred
+                    // (requires seL4 DMA capabilities for physical address mapping)
                     BLK_BASE = base;
                     BLK_LIVE = true;
-                    // Check if this is the sovereign disk
-                    if let Some(sec) = read_sector(0) {
-                        let is_sov = sec[0] == SOV_MAGIC[0]
-                            && sec[1] == SOV_MAGIC[1]
-                            && sec[2] == SOV_MAGIC[2]
-                            && sec[3] == SOV_MAGIC[3]
-                            && sec[4] == SOV_MAGIC[4]
-                            && sec[5] == SOV_MAGIC[5]
-                            && sec[6] == SOV_MAGIC[6]
-                            && sec[7] == SOV_MAGIC[7];
-                        let is_zero = sec[0] == 0 && sec[1] == 0 && sec[2] == 0 && sec[3] == 0;
-                        if is_sov || is_zero {
-                            return true;
-                        }
-                    }
-                    // Not sovereign — reset and try next
-                    write32(base, OFF_STATUS, 0);
-                    BLK_LIVE = false;
+                    return true;
             }
             slot += 1;
         }
@@ -227,6 +212,8 @@ unsafe fn setup(base: usize) -> bool {
 pub fn is_live() -> bool { unsafe { BLK_LIVE } }
 
 pub fn read_sector(sector: u64) -> Option<&'static [u8; SECTOR_SIZE]> {
+    // seL4 PL-81: DMA not ready
+    return None;
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = sector; return None; }
     #[cfg(target_arch = "aarch64")]
@@ -238,6 +225,8 @@ pub fn read_sector(sector: u64) -> Option<&'static [u8; SECTOR_SIZE]> {
 }
 
 pub fn write_sector(sector: u64, data: &[u8; SECTOR_SIZE]) -> bool {
+    // seL4 PL-81: DMA not ready
+    return false;
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = (sector, data); return false; }
     #[cfg(target_arch = "aarch64")]
@@ -306,7 +295,7 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
         dc_invalidate(core::ptr::addr_of!(BLK_STATUS).cast::<u8>(), 1);
         let status = core::ptr::read_volatile(core::ptr::addr_of!(BLK_STATUS));
         if status != 0xFF { break; }
-        if timeout >= 2_000_000 { break; }
+        if timeout >= 1_000 { break; }  // seL4: short timeout, no IRQ cap
         timeout += 1;
     }
 
@@ -319,7 +308,8 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
 
 #[allow(unused_unsafe)]
 pub fn store_valid() -> bool {
-    #[cfg(not(target_arch = "aarch64"))]
+    // seL4 PL-81: DMA ring not set up — disk reads deferred
+    return false;    #[cfg(not(target_arch = "aarch64"))]
     return false;
     #[cfg(target_arch = "aarch64")]
     unsafe {
@@ -332,6 +322,8 @@ pub fn store_valid() -> bool {
 
 #[allow(unused_unsafe)]
 pub fn store_format(node_id: u64) -> bool {
+    // seL4 PL-81: DMA not ready
+    return false;
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = node_id; return false; }
     #[cfg(target_arch = "aarch64")]
@@ -346,6 +338,8 @@ pub fn store_format(node_id: u64) -> bool {
 
 #[allow(unused_unsafe)]
 pub fn store_read(key: &[u8]) -> Option<u64> {
+    // seL4 PL-81: DMA not ready
+    return None;
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = key; return None; }
     #[cfg(target_arch = "aarch64")]
@@ -376,6 +370,8 @@ pub fn store_read(key: &[u8]) -> Option<u64> {
 
 #[allow(unused_unsafe)]
 pub fn store_write(key: &[u8], value: u64) -> bool {
+    // seL4 PL-81: DMA not ready
+    return false;
     #[cfg(not(target_arch = "aarch64"))]
     { let _ = (key, value); return false; }
     #[cfg(target_arch = "aarch64")]

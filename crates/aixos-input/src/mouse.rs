@@ -90,6 +90,8 @@ fn has_ev_abs(base: usize) -> bool {
 }
 
 pub fn init() -> Option<VirtioMouse> {
+    // seL4 PL-81: mouse scan deferred
+    return None;
     for slot in (0..32).rev() {
         let base = MMIO_BASE + slot * SLOT_SIZE;
         if r32(base, R_MAGIC) != MAGIC

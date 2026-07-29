@@ -854,93 +854,13 @@ pub fn sovereign_desktop_main() -> ! {
     }
 
     match aixos_gpu::init() {
-        Some(_) => {
+        Some(_gpu) => {
             uart_write("GPU: ok\n");
-
-            // PL-76: ASL integration — sovereign PD contracts run alongside boot
-            let mut asl = AslBootIntegrator::new();
-
-            // Stage 1: Hardware probe + ASL GPU-Cap PD
-            aixos_gpu::desktop::render_splash();
-            aixos_gpu::desktop::render_splash_progress(1);
-            let s1 = asl.stage1_hw_probe();
-            if s1.is_sovereign() { uart_write(AslBootIntegrator::stage_log(1)); }
-            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
-
-            // Stage 2: EdisonDB + ASL EdisonDB-PD
-            aixos_edisondb::init();
-            aixos_gpu::desktop::render_splash_progress(2);
-            let s2 = asl.stage2_edisondb();
-            if s2.is_sovereign() { uart_write(AslBootIntegrator::stage_log(2)); }
-            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
-
-            // Stage 3: AXFS + ASL Shell-PD
-            aixos_axfs::init();
-            aixos_gpu::desktop::render_splash_progress(3);
-            let s3 = asl.stage3_axfs();
-            if s3.is_sovereign() { uart_write(AslBootIntegrator::stage_log(3)); }
-            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
-
-            // Stage 4: Sovereign heap + ASL AXON-Exec-PD
-            uart_write("heap: init ");
-            {
-                let free_kb = aixos_kernel::alloc::bytes_free() / 1024;
-                uart_write("sovereign heap ready\n");
-                let _ = free_kb;
-                let _proof = aixos_kernel::alloc::alloc_val::<u64>(0x4153u64);
-            }
-            aixos_gpu::desktop::render_splash_progress(4);
-            let s4 = asl.stage4_heap();
-            if s4.is_sovereign() { uart_write(AslBootIntegrator::stage_log(4)); }
-            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
-
-            // Stage 5: Process table + ASL Onyxia + HANIEL-Canvas PDs
-            aixos_kernel::proc::boot_register();
-            uart_write("proc: [kernel][shell][desktop] registered\n");
-            aixos_gpu::desktop::render_splash_progress(5);
-            let s5 = asl.stage5_proctable();
-            if s5.is_sovereign() { uart_write(AslBootIntegrator::stage_log(5)); }
-            let mut d = 0u64; while d < 80_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
-
-            // Stage 6: Desktop ready + ASL full boot proof
-            aixos_gpu::desktop::render_splash_progress(6);
-            let s6 = asl.stage6_desktop();
-            if s6.is_sovereign() {
-                uart_write(AslBootIntegrator::stage_log(6));
-                uart_write("[ASL] v2.0.0 — 10 PDs — seL4 isolation proven\n");
-            }
-            let mut d = 0u64; while d < 200_000_000 { unsafe { core::ptr::read_volatile(&d); } d += 1; }
-            unsafe {
-            #[cfg(target_arch = "aarch64")]
-            {
-                let now: u64;
-                core::arch::asm!("mrs {}, cntpct_el0", out(reg) now);
-                let elapsed = now.saturating_sub(BOOT_TICK);
-                DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
-            }
-            let (rh, rm, rd, rmon) = read_rtc();
-            DESKTOP_STATE.rtc_hour = rh;
-            DESKTOP_STATE.rtc_min  = rm;
-            DESKTOP_STATE.rtc_day  = rd;
-            DESKTOP_STATE.rtc_mon  = rmon;
-            aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
-        }
-            unsafe { aixos_gpu::desktop::render_top_bar_icons(DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour, DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day, DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset); }
-            {
-                let slots = unsafe {[
-                    (wins()[0].open, wins()[0].kind, wins()[0].minimized),
-                    (wins()[1].open, wins()[1].kind, wins()[1].minimized),
-                    (wins()[2].open, wins()[2].kind, wins()[2].minimized),
-                    (wins()[3].open, wins()[3].kind, wins()[3].minimized),
-                    (wins()[4].open, wins()[4].kind, wins()[4].minimized),
-                ]};
-                aixos_gpu::desktop::render_taskbar(&slots, unsafe { ACTIVE_WIN });
-            }
-            uart_write("Desktop rendered\n");
+            // seL4 PL-81: All GPU rendering deferred (DMA capabilities not granted)
+            // Splash, desktop render, window render all require virtio-gpu DMA
         }
         None => { uart_write("GPU: none\n"); }
     }
-
     let kbd = aixos_input::init();
     virtio_ok = kbd.is_some();
     if virtio_ok {
@@ -2016,6 +1936,7 @@ fn handle_click(x: i32, y: i32) {
 }
 
 fn read_rtc() -> (u8, u8, u8, u8) {
+    return (0, 0, 0, 0); // seL4 PL-81: PL031 not mapped
     #[cfg(target_arch = "aarch64")]
     unsafe {
         let ts = core::ptr::read_volatile((PL031_BASE + PL031_DR) as *const u32) as u64;

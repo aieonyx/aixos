@@ -23,6 +23,12 @@ const _: () = assert!(core::mem::size_of::<RamfbCfg>() == 28);
 const _: () = assert!(core::mem::size_of::<FwCfgDma>() == 16);
 
 pub fn init(fb_addr: u64, width: u32, height: u32) -> bool {
+    // seL4 PL-81: fw_cfg DMA at 0x09020010 not mapped — skip ramfb
+    let _ = (fb_addr, width, height);
+    return false;
+    // seL4 PL-81: fw_cfg DMA at 0x09020010 not mapped — skip ramfb
+    let _ = (fb_addr, width, height);
+    return false;
     let cfg = RamfbCfg {
         addr:   fb_addr.to_be(),
         fmt:    FORMAT_XR24.to_be(),

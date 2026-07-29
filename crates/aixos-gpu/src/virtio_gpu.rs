@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
 
-pub const MMIO_SCAN_BASE: usize = 0x0a00_0000;
+pub const MMIO_SCAN_BASE: usize = 0x0a003a00;  // seL4: first real device slot  // seL4: devices at top of range
 pub const MMIO_STEP: usize = 0x200;
-pub const MMIO_SCAN_SLOTS: usize = 32;
+pub const MMIO_SCAN_SLOTS: usize = 4;  // seL4: 4 slots from top  // seL4: 4 slots from top  // seL4: covers first 8 virtio slots safely
 
 const OFF_MAGIC_VALUE: usize = 0x000;
 const OFF_VERSION: usize = 0x004;

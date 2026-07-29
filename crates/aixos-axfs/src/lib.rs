@@ -156,6 +156,8 @@ pub fn sync_to_disk() {}
 /// Called at boot after virtio-blk init.
 #[cfg(target_arch = "aarch64")]
 pub fn load_from_disk() {
+    // seL4 PL-81: DMA not ready — AXFS starts empty
+    return;
     unsafe {
         FILE_COUNT = 0;
         let mut slot = 0;
