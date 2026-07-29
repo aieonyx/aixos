@@ -9,6 +9,7 @@
 pub const AXON_PROOF: u32 = 0x4153;
 
 pub mod boot;
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub mod virtio_blk;
 pub mod alloc;
 pub mod proc;
