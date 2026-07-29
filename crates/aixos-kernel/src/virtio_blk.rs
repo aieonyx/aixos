@@ -1,9 +1,11 @@
 // Copyright (c) 2026 Edison Lepiten / AIEONYX
 // SPDX-License-Identifier: Apache-2.0
 // PL-54: virtio-blk MMIO probe + sovereign store
-// Fix: cache maintenance, physical addresses, FEATURES_OK
+// seL4 PL-81: DMA capabilities deferred — functions return early
 #![allow(dead_code)]
-
+#![allow(unused_variables)]
+#![allow(unreachable_code)]
+#![allow(unused_assignments)]
 const MMIO_SCAN_BASE: usize = 0x0a003a00;  // seL4: first real device slot  // seL4: devices at top of range
 const MMIO_STEP:      usize = 0x200;
 const MMIO_SLOTS:     usize = 4;  // seL4: 4 slots from top  // seL4: 4 slots from top  // seL4: covers first 8 virtio slots safely
