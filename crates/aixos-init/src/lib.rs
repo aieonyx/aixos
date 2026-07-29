@@ -53,9 +53,16 @@ pub fn orchestrate() -> u64 {
 /// Enter the full aiXos sovereign desktop loop under seL4
 #[allow(clippy::empty_loop)]
 pub fn run_desktop_loop() -> ! {
-    sovereign_desktop_main()
+    sovereign_desktop_main();
+    // Shell loop — tight poll
+    loop {
+        unsafe { run_shell_tick(); }
+    }
 }
 
+pub fn run_boot_phase() {
+    run_boot();
+}
 const UART0: *mut u8 = 0x09000000 as *mut u8;
 
 fn uart_write(s: &str) {
@@ -726,7 +733,7 @@ static mut USER_NAME_BUF: [u8; 32] = [0u8; 32];
 static mut USER_NAME_LEN: usize = 0;
 
 #[no_mangle]
-pub fn sovereign_desktop_main() -> ! {
+pub fn sovereign_desktop_main() {
     uart_write("aiXos Phoenix - Sovereign Stack Initializing...\n");
 
     #[cfg(target_arch = "aarch64")]
@@ -877,9 +884,39 @@ pub fn sovereign_desktop_main() -> ! {
     } else {
         uart_write("Mouse: none\n");
     }
-    uart_write("axos> ");
-    shell_loop(mouse, mouse_state);
+    uart_write("axos> \r\n");
+    // seL4 PL-82: boot complete — store state for shell loop
+    unsafe {
+        SHELL_MOUSE = mouse;
+        SHELL_MOUSE_STATE = mouse_state;
+        SHELL_READY = true;
+    }
 }
+
+// seL4 PL-82: shell state persisted across Microkit notified() calls
+static mut SHELL_READY: bool = false;
+static mut SHELL_MOUSE: Option<aixos_input::mouse::VirtioMouse> = None;
+static mut SHELL_MOUSE_STATE: aixos_input::mouse::MouseState =
+    aixos_input::mouse::MouseState { x: 640, y: 360, left: false, right: false };
+
+/// Boot sequence — called from Microkit init(), MUST return
+pub fn run_boot() {
+    unsafe { sovereign_desktop_main(); }
+}
+
+/// Shell tick — called from Microkit notified() each scheduling slot  
+pub fn run_shell_tick() {
+    unsafe {
+        if !SHELL_READY { return; }
+        let buf = &mut *core::ptr::addr_of_mut!(SHELL_BUF_GLOBAL);
+        let ev = aixos_input::poll();
+        if let Some(ev) = ev {
+            handle_key(buf, ev.code, ev.ch);
+        }
+    }
+}
+
+static mut SHELL_BUF_GLOBAL: ShellBuf = ShellBuf::new();
 
 fn wins() -> &'static mut [WinSlot; 6] {
     unsafe { &mut *core::ptr::addr_of_mut!(WINS) }
@@ -1977,6 +2014,8 @@ fn shell_loop(
     mut mouse_state: aixos_input::mouse::MouseState,
 ) -> ! {
     let mut buf = ShellBuf::new();
+    // seL4 PL-82: ensure no windows open at start (GPU rendering deferred)
+    unsafe { for w in wins().iter_mut() { w.open = false; } WINDOW_FOCUSED = false; }
     loop {
         if let Some(ref mut m) = mouse {
             let old_x = mouse_state.x;
@@ -2031,15 +2070,7 @@ fn shell_loop(
             }
         }
         if let Some(ev) = aixos_input::poll() {
-            unsafe {
-                let uart = 0x09000000 as *mut u8;
-                let hex = b"0123456789abcdef";
-                // Log: T=type C=code V=value
-                core::ptr::write_volatile(uart, b'T');
-                core::ptr::write_volatile(uart, hex[((ev.code >> 4) & 0xf) as usize]);
-                core::ptr::write_volatile(uart, hex[(ev.code & 0xf) as usize]);
-                core::ptr::write_volatile(uart, b'\n');
-            }
+            // seL4 PL-82: debug event logger removed
             handle_key(&mut buf, ev.code, ev.ch);
         }
         // PL-62: cooperative scheduler tick — advances process table each loop iteration
@@ -2068,14 +2099,18 @@ fn handle_key(buf: &mut ShellBuf, code: u16, ch: Option<char>) {
         28 => {
             uart_write("\n");
             let result = execute_cmd(buf);
-            if !result.is_empty() {
-                uart_write(result);
-                uart_write("\n");
-                }
             buf.clear();
-            let mut d = 0u64;
-            while d < 5_000_000 { d += 1; }
-                    uart_write("axos> ");
+            // seL4 PL-82: direct UART write bypassing any potential hang
+            unsafe {
+                let u = 0x09000000 as *mut u8;
+                for b in result.bytes() {
+                    u.write_volatile(b);
+                }
+                u.write_volatile(b'\n');
+                for b in b"axos> ".iter() {
+                    u.write_volatile(*b);
+                }
+            }
         }
         1 => {
             buf.clear();
