@@ -53,11 +53,7 @@ pub fn orchestrate() -> u64 {
 /// Enter the full aiXos sovereign desktop loop under seL4
 #[allow(clippy::empty_loop)]
 pub fn run_desktop_loop() -> ! {
-    sovereign_desktop_main();
-    // Shell loop — tight poll
-    loop {
-        unsafe { run_shell_tick(); }
-    }
+    sovereign_desktop_main()
 }
 
 pub fn run_boot_phase() {
@@ -733,7 +729,7 @@ static mut USER_NAME_BUF: [u8; 32] = [0u8; 32];
 static mut USER_NAME_LEN: usize = 0;
 
 #[no_mangle]
-pub fn sovereign_desktop_main() {
+pub fn sovereign_desktop_main() -> ! {
     uart_write("aiXos Phoenix - Sovereign Stack Initializing...\n");
 
     #[cfg(target_arch = "aarch64")]
@@ -890,6 +886,10 @@ pub fn sovereign_desktop_main() {
         SHELL_MOUSE = mouse;
         SHELL_MOUSE_STATE = mouse_state;
         SHELL_READY = true;
+    }
+    // Standalone (non-Microkit) path: run shell loop here
+    loop {
+        unsafe { run_shell_tick(); }
     }
 }
 
