@@ -150,6 +150,7 @@ unsafe fn dc_invalidate(va: *const u8, len: usize) {
     { let _ = (va, len); }
 }
 
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub fn init() -> bool {
     #[cfg(not(target_arch = "aarch64"))]
     return false;
@@ -211,6 +212,7 @@ unsafe fn setup(base: usize) -> bool {
 
 pub fn is_live() -> bool { unsafe { BLK_LIVE } }
 
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub fn read_sector(sector: u64) -> Option<&'static [u8; SECTOR_SIZE]> {
     // seL4 PL-81: DMA not ready
     return None;
@@ -224,6 +226,7 @@ pub fn read_sector(sector: u64) -> Option<&'static [u8; SECTOR_SIZE]> {
     }
 }
 
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub fn write_sector(sector: u64, data: &[u8; SECTOR_SIZE]) -> bool {
     // seL4 PL-81: DMA not ready
     return false;
@@ -307,6 +310,7 @@ unsafe fn submit_request(req_type: u32, sector: u64) {
 }
 
 #[allow(unused_unsafe)]
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub fn store_valid() -> bool {
     // seL4 PL-81: DMA ring not set up — disk reads deferred
     return false;    #[cfg(not(target_arch = "aarch64"))]
@@ -321,6 +325,7 @@ pub fn store_valid() -> bool {
 }
 
 #[allow(unused_unsafe)]
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub fn store_format(node_id: u64) -> bool {
     // seL4 PL-81: DMA not ready
     return false;
@@ -337,6 +342,7 @@ pub fn store_format(node_id: u64) -> bool {
 }
 
 #[allow(unused_unsafe)]
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub fn store_read(key: &[u8]) -> Option<u64> {
     // seL4 PL-81: DMA not ready
     return None;
@@ -369,6 +375,7 @@ pub fn store_read(key: &[u8]) -> Option<u64> {
 }
 
 #[allow(unused_unsafe)]
+#[allow(dead_code, unused_variables, unreachable_code, unused_assignments)]
 pub fn store_write(key: &[u8], value: u64) -> bool {
     // seL4 PL-81: DMA not ready
     return false;
