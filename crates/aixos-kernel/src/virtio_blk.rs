@@ -7,6 +7,10 @@
 #![allow(unreachable_code)]
 
 #![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unreachable_code)]
+
+#![allow(dead_code)]
 
 const MMIO_SCAN_BASE: usize = 0x0a003a00;  // seL4: first real device slot  // seL4: devices at top of range
 const MMIO_STEP:      usize = 0x200;
