@@ -100,9 +100,7 @@ pub fn render_splash() {
 /// Advance the progress bar to `stage` out of 6.
 /// Call after each real boot stage completes.
 /// stage: 1=hw probe, 2=edb, 3=axfs, 4=heap, 5=proc, 6=desktop
-pub fn render_splash_progress(_stage: u32) {
-    // seL4 PL-81: GPU DMA not ready
-    return;
+pub fn render_splash_progress(stage: u32) {
     let cx: u32 = 640;
     // logo_y = 300 - 64 = 236; bar_y = 236 + 128 + 24 = 388
     let bar_x: u32 = cx.saturating_sub(200);
@@ -111,7 +109,7 @@ pub fn render_splash_progress(_stage: u32) {
     let bar_h: u32 = 6;
 
     // Fill from left — ember gold gradient
-    let filled = bar_w * _stage.min(6) / 6;
+    let filled = bar_w * stage.min(6) / 6;
     // Draw filled portion with ember gold → dark orange gradient
     let mut fx: u32 = 0;
     while fx < filled {
@@ -129,7 +127,7 @@ pub fn render_splash_progress(_stage: u32) {
     let label_y = bar_y + bar_h + 8;
     // Clear previous label
     draw_rect(bar_x, label_y, bar_w, 10, 0x00000A);
-    let label: &str = match _stage {
+    let label: &str = match stage {
         1 => "Hardware probe",
         2 => "EdisonDB init",
         3 => "AXFS init",

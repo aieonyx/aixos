@@ -865,6 +865,23 @@ pub fn sovereign_desktop_main() -> ! {
             aixos_gpu::flush(0, 0, 1280, 720);
             uart_write("GPU: splash rendered\n");
             unsafe { SOVEREIGN_GPU = Some(gpu); }
+            // PL-85: render full desktop frame after splash
+            unsafe {
+                aixos_gpu::desktop::render_desktop(&DESKTOP_STATE);
+                aixos_gpu::desktop::render_top_bar_icons(
+                    DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour,
+                    DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day,
+                    DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset);
+            }
+            let desktop_slots = unsafe {[
+                (wins()[0].open, wins()[0].kind, wins()[0].minimized),
+                (wins()[1].open, wins()[1].kind, wins()[1].minimized),
+                (wins()[2].open, wins()[2].kind, wins()[2].minimized),
+                (wins()[3].open, wins()[3].kind, wins()[3].minimized),
+                (wins()[4].open, wins()[4].kind, wins()[4].minimized),
+            ]};
+            aixos_gpu::desktop::render_taskbar(&desktop_slots, unsafe { ACTIVE_WIN });
+            uart_write("GPU: desktop rendered\n");
         }
         None => { uart_write("GPU: none\n"); }
     }
