@@ -32,5 +32,9 @@ fn main() {
     }
 
     // Strip debug — prevents .eh_frame becoming LOAD sections that corrupt PE layout
+    // Add aixos-boot.ld linker script
+    let ld = root.join("boot/aixos-boot.ld");
+    println!("cargo:rustc-link-arg=-T{}", ld.display());
+    println!("cargo:rerun-if-changed={}", ld.display());
     println!("cargo:rustc-link-arg=--strip-debug");
 }
