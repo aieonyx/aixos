@@ -935,6 +935,24 @@ pub fn run_shell_tick() {
         if let Some(ev) = ev {
             handle_key(buf, ev.code, ev.ch);
         }
+        // PL-86: update uptime and re-render top bar on each tick
+        #[cfg(target_arch = "aarch64")]
+        {
+            let now: u64;
+            core::arch::asm!("mrs {}, cntpct_el0", out(reg) now);
+            let elapsed = now.saturating_sub(BOOT_TICK);
+            DESKTOP_STATE.uptime_sec = elapsed / CNTFRQ;
+        }
+        let (rh, rm, rd, rmon) = read_rtc();
+        DESKTOP_STATE.rtc_hour = rh;
+        DESKTOP_STATE.rtc_min  = rm;
+        DESKTOP_STATE.rtc_day  = rd;
+        DESKTOP_STATE.rtc_mon  = rmon;
+        // Re-render top bar with updated time
+        aixos_gpu::desktop::render_top_bar_icons(
+            DESKTOP_STATE.uptime_sec, DESKTOP_STATE.rtc_hour,
+            DESKTOP_STATE.rtc_min, DESKTOP_STATE.rtc_day,
+            DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset);
     }
 }
 
