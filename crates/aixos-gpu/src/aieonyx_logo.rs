@@ -3082,9 +3082,9 @@ pub static PIXELS: [u32; 192 * 128] = [
 ];
 
 pub fn blit(dst_x: u32, dst_y: u32) {
-    use crate::framebuffer::{FRAMEBUFFER, WIDTH};
+    use crate::framebuffer::{WIDTH, fb_addr};
     unsafe {
-        let fb = core::ptr::addr_of_mut!(FRAMEBUFFER) as *mut u32;
+        let fb = fb_addr() as *mut u32;
         let mut si = 0usize;
         let mut sy = 0u32;
         while sy < LOGO_H {

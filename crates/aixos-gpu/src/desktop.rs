@@ -167,9 +167,9 @@ pub fn render_desktop(state: &DesktopState) {
             let b = (b_base.saturating_sub(warm / 4)).min(0x2A) as u8;
             let color = ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
             if bx >= 188 && bx <= 1092 {
-                use crate::framebuffer::{FRAMEBUFFER, WIDTH};
+                use crate::framebuffer::{WIDTH, fb_addr};
                 unsafe {
-                    let fb = core::ptr::addr_of_mut!(FRAMEBUFFER) as *mut u32;
+                    let fb = fb_addr() as *mut u32;
                     let offset = by as usize * WIDTH + bx as usize;
                     core::ptr::write_volatile(fb.add(offset), color);
                 }
