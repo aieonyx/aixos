@@ -32,16 +32,38 @@ static mut RAMFB_ACTIVE: bool = false;
 pub struct VirtioGpu { pub regs: virtio_gpu::VirtioGpuRegs }
 
 #[allow(dead_code)]
+
+
+// seL4 PL-83: GPU command buffers in phoenix_heap (VA=PA guaranteed)
+// Layout: 0x4A000000=Virtqueue, 0x4A010000=cmd bufs
+const GPU_CMD_BASE: u64 = 0x4B010000;
+const GPU_CMD_CREATE_OFFSET:   u64 = 0x000;
+const GPU_CMD_ATTACH_OFFSET:   u64 = 0x040;
+const GPU_CMD_SCANOUT_OFFSET:  u64 = 0x080;
+const GPU_CMD_TRANSFER_OFFSET: u64 = 0x0c0;
+const GPU_CMD_FLUSH_OFFSET:    u64 = 0x100;
+const GPU_RESP_OFFSET:         u64 = 0x140;
+// seL4 PL-83: static GPU command buffers (VA=PA, DMA-safe)
+static mut CMD_CREATE_2D: commands::GpuResourceCreate2d =
+    commands::GpuResourceCreate2d { hdr: commands::GpuCtrlHdr { cmd_type:0,flags:0,fence_id:0,ctx_id:0,padding:0 }, resource_id:0,format:0,width:0,height:0 };
+static mut CMD_ATTACH: commands::GpuResourceAttachBacking =
+    commands::GpuResourceAttachBacking { hdr: commands::GpuCtrlHdr { cmd_type:0,flags:0,fence_id:0,ctx_id:0,padding:0 }, resource_id:0,nr_entries:0,entry:commands::GpuMemEntry{addr:0,length:0,padding:0} };
+static mut CMD_SCANOUT: commands::GpuSetScanout =
+    commands::GpuSetScanout { hdr: commands::GpuCtrlHdr { cmd_type:0,flags:0,fence_id:0,ctx_id:0,padding:0 }, r:commands::GpuRect{x:0,y:0,width:0,height:0},scanout_id:0,resource_id:0 };
+static mut CMD_TRANSFER: commands::GpuTransferToHost2d =
+    commands::GpuTransferToHost2d { hdr: commands::GpuCtrlHdr { cmd_type:0,flags:0,fence_id:0,ctx_id:0,padding:0 }, r:commands::GpuRect{x:0,y:0,width:0,height:0},offset:0,resource_id:0,padding:0 };
+static mut CMD_FLUSH: commands::GpuResourceFlush =
+    commands::GpuResourceFlush { hdr: commands::GpuCtrlHdr { cmd_type:0,flags:0,fence_id:0,ctx_id:0,padding:0 }, r:commands::GpuRect{x:0,y:0,width:0,height:0},resource_id:0,padding:0 };
+
 impl VirtioGpu {
     fn submit(&self, ptr: *mut u8, len: u32) {
         unsafe {
-            let ctrlq = &mut *core::ptr::addr_of_mut!(CTRLQ);
-            let resp = core::ptr::addr_of_mut!(RESP_BUF);
+            // seL4 PL-83: use heap queue (VA=PA guaranteed at 0x4A000000)
+            let ctrlq = &mut *(0x4B000000u64 as *mut virtqueue::Virtqueue);
+            // Response buffer at 0x4A010140 (in phoenix_heap, VA=PA)
+            let resp = (GPU_CMD_BASE + GPU_RESP_OFFSET) as *mut commands::GpuCtrlResp;
             // Clear response
-            core::ptr::write_volatile(
-                resp as *mut u32,
-                0u32
-            );
+            core::ptr::write_volatile(resp as *mut u32, 0u32);
             // Chained: cmd -> resp
             ctrlq.add_chained(
                 ptr as u64, len,
@@ -49,98 +71,144 @@ impl VirtioGpu {
                 core::mem::size_of::<commands::GpuCtrlResp>() as u32
             );
             ctrlq.notify(&self.regs, 0);
-            let mut tries: u32 = 0;
-            loop {
-                if ctrlq.poll_used().is_some() { break; }
-                tries = tries.wrapping_add(1);
-                if tries > 1_000_000 { break; }
-            }
-            LAST_WAIT = tries;
+            // seL4 PL-83: fire-and-forget — no blocking wait
+            // QEMU processes virtio-gpu commands asynchronously
         }
     }
 
     fn resource_create_2d(&self, resource_id: u32, format: u32, width: u32, height: u32) {
-        let mut cmd = commands::GpuResourceCreate2d {
-            hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_RESOURCE_CREATE_2D,
-                flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
-            resource_id, format, width, height,
-        };
-        self.submit(&mut cmd as *mut _ as *mut u8,
-            core::mem::size_of::<commands::GpuResourceCreate2d>() as u32);
+        // seL4 PL-83: use static buffer (VA=PA, safe for DMA)
+        unsafe {
+            CMD_CREATE_2D = commands::GpuResourceCreate2d {
+                hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_RESOURCE_CREATE_2D,
+                    flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
+                resource_id, format, width, height,
+            };
+            self.submit(core::ptr::addr_of_mut!(CMD_CREATE_2D) as *mut u8,
+                core::mem::size_of::<commands::GpuResourceCreate2d>() as u32);
+        }
     }
 
     fn attach_backing(&self, resource_id: u32, addr: u64, length: u32) {
-        let mut cmd = commands::GpuResourceAttachBacking {
-            hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_RESOURCE_ATTACH_BACKING,
-                flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
-            resource_id, nr_entries: 1,
-            entry: commands::GpuMemEntry { addr, length, padding: 0 },
-        };
-        self.submit(&mut cmd as *mut _ as *mut u8,
-            core::mem::size_of::<commands::GpuResourceAttachBacking>() as u32);
+        unsafe {
+            CMD_ATTACH = commands::GpuResourceAttachBacking {
+                hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_RESOURCE_ATTACH_BACKING,
+                    flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
+                resource_id, nr_entries: 1,
+                entry: commands::GpuMemEntry { addr, length, padding: 0 },
+            };
+            self.submit(core::ptr::addr_of_mut!(CMD_ATTACH) as *mut u8,
+                core::mem::size_of::<commands::GpuResourceAttachBacking>() as u32);
+        }
     }
 
     fn set_scanout_cmd(&self, scanout_id: u32, resource_id: u32, width: u32, height: u32) {
-        let mut cmd = commands::GpuSetScanout {
-            hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_SET_SCANOUT,
-                flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
-            r: commands::GpuRect { x: 0, y: 0, width, height },
-            scanout_id, resource_id,
-        };
-        self.submit(&mut cmd as *mut _ as *mut u8,
-            core::mem::size_of::<commands::GpuSetScanout>() as u32);
+        unsafe {
+            CMD_SCANOUT = commands::GpuSetScanout {
+                hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_SET_SCANOUT,
+                    flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
+                r: commands::GpuRect { x: 0, y: 0, width, height },
+                scanout_id, resource_id,
+            };
+            self.submit(core::ptr::addr_of_mut!(CMD_SCANOUT) as *mut u8,
+                core::mem::size_of::<commands::GpuSetScanout>() as u32);
+        }
     }
 
     fn transfer_to_host_2d(&self, resource_id: u32, x: u32, y: u32, w: u32, h: u32) {
-        let mut cmd = commands::GpuTransferToHost2d {
-            hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_TRANSFER_TO_HOST_2D,
-                flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
-            r: commands::GpuRect { x, y, width: w, height: h },
-            offset: 0, resource_id, padding: 0,
-        };
-        self.submit(&mut cmd as *mut _ as *mut u8,
-            core::mem::size_of::<commands::GpuTransferToHost2d>() as u32);
+        unsafe {
+            CMD_TRANSFER = commands::GpuTransferToHost2d {
+                hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_TRANSFER_TO_HOST_2D,
+                    flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
+                r: commands::GpuRect { x, y, width: w, height: h },
+                offset: 0, resource_id, padding: 0,
+            };
+            self.submit(core::ptr::addr_of_mut!(CMD_TRANSFER) as *mut u8,
+                core::mem::size_of::<commands::GpuTransferToHost2d>() as u32);
+        }
     }
 
     fn resource_flush(&self, resource_id: u32, x: u32, y: u32, w: u32, h: u32) {
-        let mut cmd = commands::GpuResourceFlush {
-            hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_RESOURCE_FLUSH,
-                flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
-            r: commands::GpuRect { x, y, width: w, height: h },
-            resource_id, padding: 0,
-        };
-        self.submit(&mut cmd as *mut _ as *mut u8,
-            core::mem::size_of::<commands::GpuResourceFlush>() as u32);
+        unsafe {
+            CMD_FLUSH = commands::GpuResourceFlush {
+                hdr: commands::GpuCtrlHdr { cmd_type: virtio_gpu::CMD_RESOURCE_FLUSH,
+                    flags: 0, fence_id: 0, ctx_id: 0, padding: 0 },
+                r: commands::GpuRect { x, y, width: w, height: h },
+                resource_id, padding: 0,
+            };
+            self.submit(core::ptr::addr_of_mut!(CMD_FLUSH) as *mut u8,
+                core::mem::size_of::<commands::GpuResourceFlush>() as u32);
+        }
     }
 }
 
 pub fn init() -> Option<VirtioGpu> {
     #[cfg(test)] return None;
     #[cfg(not(test))] {
-    // Try ramfb first
+    // seL4 PL-83: try ramfb first (fw_cfg DMA at 0x4B008020, VA=PA)
     let fb = framebuffer::fb_addr();
     if ramfb::init(fb, framebuffer::WIDTH as u32, framebuffer::HEIGHT as u32) {
         unsafe { RAMFB_ACTIVE = true; }
+        unsafe { let u = 0x09000000 as *mut u8; for b in b"GPU: ramfb ok\n" { u.write_volatile(*b); } }
         return Some(VirtioGpu { regs: virtio_gpu::VirtioGpuRegs { base: 0 } });
     }
+    unsafe { let u = 0x09000000 as *mut u8; for b in b"GPU: ramfb fail\n" { u.write_volatile(*b); } }
     // Fall back to virtio-gpu
     let regs = virtio_gpu::probe()?;
+    // seL4 PL-83: log GPU base address
+    unsafe {
+        let u = 0x09000000 as *mut u8;
+        u.write_volatile(b'G');
+        // Print base address nibble
+        u.write_volatile(b'0' + ((regs.base >> 8) & 0xf) as u8);
+        u.write_volatile(b'\n');
+    }
     // virtio-mmio v1 legacy init sequence
     regs.set_status(0);
     regs.set_status(virtio_gpu::STATUS_ACKNOWLEDGE);
     regs.set_status(virtio_gpu::STATUS_ACKNOWLEDGE | virtio_gpu::STATUS_DRIVER);
-    let features = regs.device_features();
+    // v2 modern: negotiate features then set FEATURES_OK
+    let features = regs.device_features() & 0x1;  // keep only VIRGL feature
     regs.set_driver_features(features);
+    regs.set_status(virtio_gpu::STATUS_ACKNOWLEDGE | virtio_gpu::STATUS_DRIVER
+        | virtio_gpu::STATUS_FEATURES_OK);
+    // Verify FEATURES_OK was accepted
+    let feat_status = regs.status();
+    if feat_status & virtio_gpu::STATUS_FEATURES_OK == 0 { return None; }
     regs.select_queue(0);
     if regs.queue_num_max() == 0 { return None; }
     regs.set_queue_num(virtqueue::QUEUE_SIZE as u32);
-    // v1 legacy: use QueuePFN (page frame number) not descriptor addresses
+    // v2 modern: use absolute physical addresses
+    // phoenix_heap at 0x4A000000 has guaranteed VA=PA (system file identity map)
+    // Place CTRLQ at start of heap
     unsafe {
-        let q = core::ptr::addr_of_mut!(CTRLQ);
-        let ring_addr = core::ptr::addr_of_mut!((*q).ring) as u64;
-        let pfn = (ring_addr >> 12) as u32;
-        regs.set_queue_align(4096);
-        regs.set_queue_pfn(pfn);
+        let heap_base = 0x4B000000u64;
+        let q = heap_base as *mut virtqueue::Virtqueue;
+        // Zero the queue memory
+        core::ptr::write_bytes(q as *mut u8, 0, core::mem::size_of::<virtqueue::Virtqueue>());
+        let q = &mut *q;
+        // Descriptor table address
+        let desc_addr = core::ptr::addr_of!(q.ring.desc) as u64;
+        regs.set_queue_desc_low(desc_addr as u32);
+        regs.set_queue_desc_high((desc_addr >> 32) as u32);
+        // Available ring address
+        let avail_addr = core::ptr::addr_of!(q.ring.avail) as u64;
+        // Check if virtio_gpu has set_queue_avail
+        regs.set_queue_avail_low(avail_addr as u32);
+        regs.set_queue_avail_high((avail_addr >> 32) as u32);
+        // Used ring address
+        let used_addr = core::ptr::addr_of!(q.ring.used) as u64;
+        regs.set_queue_used_low(used_addr as u32);
+        regs.set_queue_used_high((used_addr >> 32) as u32);
+        // Enable queue
+        regs.set_queue_ready(1);
+    }
+    let final_status = regs.status();
+    unsafe {
+        let u = 0x09000000 as *mut u8;
+        u.write_volatile(b'S');
+        u.write_volatile(b'0' + (final_status & 0xf) as u8);
+        u.write_volatile(b'\n');
     }
     regs.set_status(virtio_gpu::STATUS_ACKNOWLEDGE | virtio_gpu::STATUS_DRIVER
         | virtio_gpu::STATUS_DRIVER_OK);

@@ -8,7 +8,8 @@ pub const HEIGHT: usize = 720;
 pub static mut FRAMEBUFFER: [u32; WIDTH * HEIGHT] = [0; WIDTH * HEIGHT];
 
 pub fn fb_addr() -> u64 {
-    core::ptr::addr_of!(FRAMEBUFFER) as u64
+    // seL4 PL-83: framebuffer mapped at fixed phys addr 0x44000000
+    0x44000000u64
 }
 
 pub fn fb_size() -> u32 { (WIDTH * HEIGHT * 4) as u32 }
@@ -21,7 +22,7 @@ pub fn cache_flush() {
 
 pub fn fill(color: u32) {
     unsafe {
-        let ptr = core::ptr::addr_of_mut!(FRAMEBUFFER) as *mut u32;
+        let ptr = 0x44000000u64 as *mut u32;
         let mut i = 0;
         while i < WIDTH * HEIGHT {
             core::ptr::write_volatile(ptr.add(i), color);
@@ -32,7 +33,7 @@ pub fn fill(color: u32) {
 
 pub fn fill_rect(x: u32, y: u32, w: u32, h: u32, color: u32) {
     unsafe {
-        let ptr = core::ptr::addr_of_mut!(FRAMEBUFFER) as *mut u32;
+        let ptr = 0x44000000u64 as *mut u32;
         let mut row = 0;
         while row < h {
             let py = y + row;

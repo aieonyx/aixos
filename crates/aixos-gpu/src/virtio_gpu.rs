@@ -19,8 +19,12 @@ const OFF_QUEUE_NUM: usize = 0x038;
 const OFF_QUEUE_ALIGN: usize = 0x03c;
 const OFF_QUEUE_READY: usize = 0x044;
 const OFF_QUEUE_NOTIFY: usize = 0x050;
-const OFF_QUEUE_DESC_LOW: usize = 0x080;
+const OFF_QUEUE_DESC_LOW:  usize = 0x080;
 const OFF_QUEUE_DESC_HIGH: usize = 0x084;
+const OFF_QUEUE_AVAIL_LOW: usize = 0x090;
+const OFF_QUEUE_AVAIL_HIGH: usize = 0x094;
+const OFF_QUEUE_USED_LOW:  usize = 0x0a0;
+const OFF_QUEUE_USED_HIGH: usize = 0x0a4;
 const OFF_QUEUE_DRIVER_LOW: usize = 0x090;
 const OFF_QUEUE_DRIVER_HIGH: usize = 0x094;
 const OFF_QUEUE_DEVICE_LOW: usize = 0x0a0;
@@ -74,6 +78,10 @@ impl VirtioGpuRegs {
     pub fn notify_queue(&self, i: u32) { unsafe { self.write32(OFF_QUEUE_NOTIFY, i) } }
     pub fn set_queue_desc_low(&self, v: u32) { unsafe { self.write32(OFF_QUEUE_DESC_LOW, v) } }
     pub fn set_queue_desc_high(&self, v: u32) { unsafe { self.write32(OFF_QUEUE_DESC_HIGH, v) } }
+    pub fn set_queue_avail_low(&self, v: u32)  { unsafe { self.write32(OFF_QUEUE_AVAIL_LOW, v) } }
+    pub fn set_queue_avail_high(&self, v: u32) { unsafe { self.write32(OFF_QUEUE_AVAIL_HIGH, v) } }
+    pub fn set_queue_used_low(&self, v: u32)   { unsafe { self.write32(OFF_QUEUE_USED_LOW, v) } }
+    pub fn set_queue_used_high(&self, v: u32)  { unsafe { self.write32(OFF_QUEUE_USED_HIGH, v) } }
     pub fn set_queue_driver_low(&self, v: u32) { unsafe { self.write32(OFF_QUEUE_DRIVER_LOW, v) } }
     pub fn set_queue_driver_high(&self, v: u32) { unsafe { self.write32(OFF_QUEUE_DRIVER_HIGH, v) } }
     pub fn set_queue_device_low(&self, v: u32) { unsafe { self.write32(OFF_QUEUE_DEVICE_LOW, v) } }
@@ -91,6 +99,16 @@ pub fn probe() -> Option<VirtioGpuRegs> {
         let magic = unsafe { regs.read32(OFF_MAGIC_VALUE) };
         let version = unsafe { regs.read32(OFF_VERSION) };
         let device_id = unsafe { regs.read32(OFF_DEVICE_ID) };
+        // seL4 PL-83 debug: print magic/version/device_id
+        unsafe {
+            let u = 0x09000000 as *mut u8;
+            u.write_volatile(b'P');
+            u.write_volatile(b'0' + (slot as u8 & 0xf));
+            u.write_volatile(b'v');
+            u.write_volatile(b'0' + (version as u8 & 0xf));
+            u.write_volatile(b'd');
+            u.write_volatile(b'0' + (device_id as u8 & 0xf));
+        }
         if magic == VIRTIO_MAGIC && version == VIRTIO_VERSION && device_id == GPU_DEVICE_ID {
             return Some(regs);
         }

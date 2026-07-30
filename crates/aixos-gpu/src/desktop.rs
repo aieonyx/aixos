@@ -78,8 +78,6 @@ impl DesktopState {
 /// Draw the static splash background + logo + wordmark.
 /// Call once at boot init. Then call render_splash_progress() for each stage.
 pub fn render_splash() {
-    // seL4 PL-81: GPU DMA not ready — splash deferred
-    return;
     // Full black background
     draw_rect(0, 0, 1280, 720, 0x00000A);
 

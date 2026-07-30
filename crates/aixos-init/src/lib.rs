@@ -857,10 +857,14 @@ pub fn sovereign_desktop_main() -> ! {
     }
 
     match aixos_gpu::init() {
-        Some(_gpu) => {
+        Some(gpu) => {
             uart_write("GPU: ok\n");
-            // seL4 PL-81: All GPU rendering deferred (DMA capabilities not granted)
-            // Splash, desktop render, window render all require virtio-gpu DMA
+            // PL-83: GPU DMA enabled — render splash and flush to display
+            aixos_gpu::desktop::render_splash();
+            // Flush full screen to virtio-gpu display
+            aixos_gpu::flush(0, 0, 1280, 720);
+            uart_write("GPU: splash rendered\n");
+            unsafe { SOVEREIGN_GPU = Some(gpu); }
         }
         None => { uart_write("GPU: none\n"); }
     }
@@ -894,6 +898,7 @@ pub fn sovereign_desktop_main() -> ! {
 }
 
 // seL4 PL-82: shell state persisted across Microkit notified() calls
+static mut SOVEREIGN_GPU: Option<aixos_gpu::VirtioGpu> = None;
 static mut SHELL_READY: bool = false;
 static mut SHELL_MOUSE: Option<aixos_input::mouse::VirtioMouse> = None;
 static mut SHELL_MOUSE_STATE: aixos_input::mouse::MouseState =
