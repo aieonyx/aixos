@@ -537,15 +537,20 @@ fn execute_cmd(buf: &ShellBuf) -> &'static str {
         }
         b"window" => {
             unsafe {
-                if let Some(i) = find_kind(0) {
+                if let Some(i) = find_kind(1) {
                     ACTIVE_WIN = i;
                 } else {
                     let slot = find_free().unwrap_or(0);
                     wins()[slot].open = true;
-                    wins()[slot].kind = 0;
+                    wins()[slot].kind = 1;
+                    wins()[slot].x = 300;
+                    wins()[slot].y = 80;
+                    wins()[slot].w = 600;
+                    wins()[slot].h = 400;
                     ACTIVE_WIN = slot;
                 }
-                render_all_windows();
+                // PL-87: render only the window, not full desktop
+                render_window_for_slot(ACTIVE_WIN);
                 "window opened"
             }
         }
