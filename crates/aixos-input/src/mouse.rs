@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // virtio-mmio v1 absolute pointer driver
 
-use core::ptr::{addr_of, addr_of_mut, read_volatile, write_volatile};
+use core::ptr::{read_volatile, write_volatile};
 
 const MMIO_BASE: usize = 0x0a00_0000;
 const SLOT_SIZE: usize = 0x200;
