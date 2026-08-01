@@ -58,11 +58,10 @@ struct InputEvent {
     value: u32,
 }
 
-#[repr(align(4096))]
-struct Ring([u8; 8192]);
-static mut RING: Ring = Ring([0; 8192]);
-static mut EVENTS: [InputEvent; QUEUE_SIZE] =
-    [InputEvent { ev_type: 0, code: 0, value: 0 }; QUEUE_SIZE];
+// seL4 PL-88: RING at fixed gpu_dma addr (VA=PA)
+const RING_ADDR: usize = 0x4B002000;
+// seL4 PL-88: EVENTS at fixed gpu_dma addr (VA=PA)
+const EVENTS_ADDR: usize = 0x4B004000;  // after ring (0x4B002000 + 8KB)
 
 pub struct VirtioMouse {
     base: usize,
@@ -93,8 +92,6 @@ fn has_ev_abs(base: usize) -> bool {
 }
 
 pub fn init() -> Option<VirtioMouse> {
-    // seL4 PL-81: mouse scan deferred
-    return None;
     for slot in (0..32).rev() {
         let base = MMIO_BASE + slot * SLOT_SIZE;
         if r32(base, R_MAGIC) != MAGIC
@@ -110,15 +107,24 @@ pub fn init() -> Option<VirtioMouse> {
 }
 
 fn setup(base: usize) -> VirtioMouse {
-    let ring = unsafe { addr_of_mut!(RING.0) as *mut u8 };
-    let evs = addr_of_mut!(EVENTS) as *mut InputEvent;
+    // seL4 PL-88: use fixed gpu_dma addresses (VA=PA)
+    let ring = RING_ADDR as *mut u8;
+    let evs = EVENTS_ADDR as *mut InputEvent;
+    // Zero the ring and events buffers
+    unsafe {
+        core::ptr::write_bytes(ring, 0, 8192);
+        core::ptr::write_bytes(evs as *mut u8, 0, core::mem::size_of::<InputEvent>() * QUEUE_SIZE);
+    }
     w32(base, R_STATUS, 0);
-    w32(base, R_STATUS, 1);
-    w32(base, R_STATUS, 3);
+    w32(base, R_STATUS, 1);  // ACKNOWLEDGE
+    w32(base, R_STATUS, 3);  // ACKNOWLEDGE | DRIVER
+    w32(base, 0x020, 0);     // driver features = 0
+    w32(base, R_STATUS, 11); // ACKNOWLEDGE | DRIVER | FEATURES_OK
     w32(base, R_GUEST_PAGE, 4096);
     w32(base, R_QUEUE_SEL, 0);
     w32(base, R_QUEUE_NUM, QUEUE_SIZE as u32);
     unsafe {
+        // v2 modern: descriptor table at RING_ADDR
         for i in 0..QUEUE_SIZE {
             let d = ring.add(i * 16);
             write_volatile(d as *mut u64, evs.add(i) as u64);
@@ -133,15 +139,25 @@ fn setup(base: usize) -> VirtioMouse {
         }
         write_volatile(avail.add(2) as *mut u16, QUEUE_SIZE as u16);
     }
-    w32(base, R_QUEUE_PFN, (addr_of!(RING) as usize >> 12) as u32);
-    w32(base, R_STATUS, 7);
+    // v2 modern: use descriptor/avail/used addresses directly
+    let desc_addr = RING_ADDR as u64;
+    let avail_addr = (RING_ADDR + AVAIL_OFF) as u64;
+    let used_addr = (RING_ADDR + USED_OFF) as u64;
+    w32(base, 0x080, desc_addr as u32);
+    w32(base, 0x084, (desc_addr >> 32) as u32);
+    w32(base, 0x090, avail_addr as u32);
+    w32(base, 0x094, (avail_addr >> 32) as u32);
+    w32(base, 0x0a0, used_addr as u32);
+    w32(base, 0x0a4, (used_addr >> 32) as u32);
+    w32(base, 0x044, 1); // QueueReady
+    w32(base, R_STATUS, 15); // ACKNOWLEDGE|DRIVER|FEATURES_OK|DRIVER_OK
     w32(base, R_NOTIFY, 0);
     VirtioMouse { base, last_used: 0, avail_idx: QUEUE_SIZE as u16 }
 }
 
 impl VirtioMouse {
     fn ring_base(&self) -> usize {
-        addr_of!(RING) as usize
+        RING_ADDR
     }
 
     fn used_idx(&self) -> u16 {
@@ -170,11 +186,12 @@ impl VirtioMouse {
         }
         let mut changed = false;
         loop {
-            while self.used_idx() == self.last_used {
-                core::hint::spin_loop();
+            // seL4 PL-88: non-blocking — check once, don't spin
+            if self.used_idx() == self.last_used {
+                break;
             }
             let id = self.used_id(self.last_used);
-            let ev = unsafe { read_volatile((addr_of!(EVENTS) as *const InputEvent).add(id)) };
+            let ev = unsafe { read_volatile((EVENTS_ADDR as *const InputEvent).add(id)) };
             self.last_used = self.last_used.wrapping_add(1);
             self.recycle(id);
             match ev.ev_type {
