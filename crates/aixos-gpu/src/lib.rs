@@ -36,11 +36,17 @@ pub struct VirtioGpu { pub regs: virtio_gpu::VirtioGpuRegs }
 
 // seL4 PL-83: GPU command buffers in phoenix_heap (VA=PA guaranteed)
 // Layout: 0x4A000000=Virtqueue, 0x4A010000=cmd bufs
+#[allow(dead_code)]
 const GPU_CMD_BASE: u64 = 0x4B010000;
+#[allow(dead_code)]
 const GPU_CMD_CREATE_OFFSET:   u64 = 0x000;
+#[allow(dead_code)]
 const GPU_CMD_ATTACH_OFFSET:   u64 = 0x040;
+#[allow(dead_code)]
 const GPU_CMD_SCANOUT_OFFSET:  u64 = 0x080;
+#[allow(dead_code)]
 const GPU_CMD_TRANSFER_OFFSET: u64 = 0x0c0;
+#[allow(dead_code)]
 const GPU_CMD_FLUSH_OFFSET:    u64 = 0x100;
 const GPU_RESP_OFFSET:         u64 = 0x140;
 // seL4 PL-83: static GPU command buffers (VA=PA, DMA-safe)
