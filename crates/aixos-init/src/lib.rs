@@ -935,6 +935,8 @@ pub fn run_boot() {
 pub fn run_shell_tick() {
     unsafe {
         if !SHELL_READY { return; }
+        // PL-89: poll mouse on every tick
+        handle_mouse_irq();
         let buf = &mut *core::ptr::addr_of_mut!(SHELL_BUF_GLOBAL);
         let ev = aixos_input::poll();
         if let Some(ev) = ev {
@@ -960,6 +962,23 @@ pub fn run_shell_tick() {
             DESKTOP_STATE.rtc_mon, DESKTOP_STATE.tz_offset);
     }
 }
+/// Called from Microkit notified() when virtio-tablet IRQ fires
+pub fn handle_mouse_irq() {
+    unsafe {
+        if let Some(ref mut m) = SHELL_MOUSE {
+            let old_x = SHELL_MOUSE_STATE.x;
+            let old_y = SHELL_MOUSE_STATE.y;
+            if m.poll(&mut SHELL_MOUSE_STATE) {
+                // Erase old cursor, draw new cursor
+                aixos_gpu::erase_cursor(old_x, old_y);
+                CURSOR_X = SHELL_MOUSE_STATE.x;
+                CURSOR_Y = SHELL_MOUSE_STATE.y;
+                aixos_gpu::draw_cursor(SHELL_MOUSE_STATE.x, SHELL_MOUSE_STATE.y);
+            }
+        }
+    }
+}
+
 
 static mut SHELL_BUF_GLOBAL: ShellBuf = ShellBuf::new();
 

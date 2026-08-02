@@ -118,8 +118,6 @@ fn setup(base: usize) -> VirtioMouse {
     w32(base, R_STATUS, 0);
     w32(base, R_STATUS, 1);  // ACKNOWLEDGE
     w32(base, R_STATUS, 3);  // ACKNOWLEDGE | DRIVER
-    w32(base, 0x020, 0);     // driver features = 0
-    w32(base, R_STATUS, 11); // ACKNOWLEDGE | DRIVER | FEATURES_OK
     w32(base, R_GUEST_PAGE, 4096);
     w32(base, R_QUEUE_SEL, 0);
     w32(base, R_QUEUE_NUM, QUEUE_SIZE as u32);
@@ -139,18 +137,10 @@ fn setup(base: usize) -> VirtioMouse {
         }
         write_volatile(avail.add(2) as *mut u16, QUEUE_SIZE as u16);
     }
-    // v2 modern: use descriptor/avail/used addresses directly
-    let desc_addr = RING_ADDR as u64;
-    let avail_addr = (RING_ADDR + AVAIL_OFF) as u64;
-    let used_addr = (RING_ADDR + USED_OFF) as u64;
-    w32(base, 0x080, desc_addr as u32);
-    w32(base, 0x084, (desc_addr >> 32) as u32);
-    w32(base, 0x090, avail_addr as u32);
-    w32(base, 0x094, (avail_addr >> 32) as u32);
-    w32(base, 0x0a0, used_addr as u32);
-    w32(base, 0x0a4, (used_addr >> 32) as u32);
-    w32(base, 0x044, 1); // QueueReady
-    w32(base, R_STATUS, 15); // ACKNOWLEDGE|DRIVER|FEATURES_OK|DRIVER_OK
+    // seL4 PL-89: legacy v1 device (version==1) — QueuePFN is the ONLY
+    // queue registration register QEMU honors. RING_ADDR is identity-mapped.
+    w32(base, R_QUEUE_PFN, (RING_ADDR >> 12) as u32);
+    w32(base, R_STATUS, 7); // ACK|DRIVER|DRIVER_OK (legacy)
     w32(base, R_NOTIFY, 0);
     VirtioMouse { base, last_used: 0, avail_idx: QUEUE_SIZE as u16 }
 }
